@@ -54,11 +54,49 @@ python tools/compile_wad.py Qwen/Qwen3-0.6B 220 wad.json   # needs a GPU
 python -m http.server 8778                                  # then open index.html
 ```
 
-## Status
+## Three ways in
 
-Recorded level: works. **In-browser generation** (type your own sentence) needs
-a custom ONNX export — the published exports of Qwen2.5-0.5B and SmolLM2-135M
-output only `logits` and `present.N.key/value`, **no hidden states and no
-attentions**, so the level cannot be compiled from them. **brainscope connect**
-(drive the tunnel live from your own model) is next; its websocket already
-streams `lens` and `head_entropy` per layer per token.
+- **RECORDED** — Qwen3-0.6B, 220 tokens with thinking on, compiled ahead of
+  time. 1 MB, instant, nothing to download.
+- **YOUR OWN SENTENCE** — SmolLM2-135M runs in your tab (177 MB, once).
+  The published ONNX exports were no use: they emit only `logits` and
+  `present.N.key/value` — no hidden states, no attentions — so `tools/`
+  exports a graph that **emits the level itself**: logit-lens argmax per
+  layer, per-head sink and attention entropy. A token costs a few hundred
+  numbers instead of megabytes. Verified against PyTorch: `lens_id` exact,
+  floats to 3e-5.
+- **CONNECT BRAINSCOPE** — point it at your own
+  [brainscope](https://github.com/moudrkat/brainscope) server and the same
+  tunnel runs on your own model. Its websocket already streams `lens` and
+  `head_entropy` per layer per token; per-head sink is not in that payload,
+  so the beams there fall back to `attn_top == 0`. **Untested against a live
+  server** — the recorded and in-browser paths are the ones I have run.
+
+### Cheats
+
+`IDDQD` turns the sector lighting off — which is the same as turning the
+attention sink off, because the sink is what made the middle of the tunnel
+dark. `IDKFA` puts the probability on every sign and lights every head's
+beam, not just the ones over 30 %. `IDCLIP` lets you leave the tunnel and
+look at the network from outside. `IDDT` looks down.
+
+`?auto=1` walks forward on its own — for recording. `?f=12` is not a thing;
+walk there.
+
+## One number you should know before trusting the live mode
+
+The in-browser model is 4-bit quantised, and that is not free
+(measured on `The capital of France is`, one prompt):
+
+| build | size | signs identical to fp32 | emitted token |
+|---|---|---|---|
+| fp32 | 545 MB | 31/31 | ` Paris` |
+| 8-bit MatMulNBits | 240 MB | 31/31 | ` Paris` |
+| **4-bit, block 32** | **177 MB** | **28/31** | ` Paris` |
+| 4-bit, block 64 | 177 MB | 21/31 | ` the` |
+
+8-bit is the honest build but `onnxruntime-web` would not run it — its
+`MatMulNBits` kernel took the 4-bit weights and refused the 8-bit ones. So
+the tab runs 4-bit, and about three of the thirty-one signs differ from what
+the full-precision model would have written. The recorded level has no such
+caveat: it comes straight from PyTorch.

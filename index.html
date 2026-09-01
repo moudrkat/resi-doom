@@ -38,6 +38,16 @@
   #cheat{position:fixed;left:0;right:0;top:16px;z-index:6;text-align:center;font-size:13px;
     letter-spacing:2px;color:#9dff7a;text-shadow:0 0 12px #000;opacity:0;transition:opacity .5s;
     pointer-events:none}
+  #modes{display:flex;flex-direction:column;gap:7px;margin:18px 0 4px}
+  .mb{background:#140f0a;color:#c9a86a;border:1px solid #3a2c18;padding:9px 20px;
+    font:inherit;font-size:11.5px;letter-spacing:2px;cursor:pointer}
+  .mb:hover,.mb.on{background:#241708;border-color:#ffb03a;color:#ffb03a}
+  #mform{display:flex;gap:6px;margin-top:4px}
+  #mform input{background:#0d0a07;border:1px solid #3a2c18;color:#ffe0a0;font:inherit;
+    font-size:12px;padding:8px 11px;width:340px}
+  #mform button{background:#241708;border:1px solid #ffb03a;color:#ffb03a;font:inherit;
+    font-size:11px;letter-spacing:2px;padding:8px 14px;cursor:pointer}
+  #mstat{color:#9dff7a!important;min-height:1.4em;font-size:11.5px!important}
   #xh{position:fixed;left:50%;top:50%;width:2px;height:2px;margin:-1px;z-index:4;background:#ffb03a;opacity:.45}
 </style>
 </head>
@@ -45,7 +55,14 @@
 <div id="start">
   <h1>Q W E N 3 - 0 . 6 B &nbsp;·&nbsp; E 1 M 1</h1>
   <p id="blurb">loading level…</p>
-  <p class="dim">CLICK TO ENTER · W FORWARD · S BACK · SHIFT RUN · MOUSE LOOK · ESC OUT<br>AND YES, THE CHEATS WORK</p>
+  <div id="modes">
+    <button class="mb" data-m="recorded">RECORDED &nbsp;·&nbsp; Qwen3-0.6B thinking</button>
+    <button class="mb" data-m="live">YOUR OWN SENTENCE &nbsp;·&nbsp; SmolLM2-135M, 177 MB, runs in this tab</button>
+    <button class="mb" data-m="bs">CONNECT BRAINSCOPE &nbsp;·&nbsp; your own model, live</button>
+  </div>
+  <div id="mform"></div>
+  <p id="mstat"></p>
+  <p class="dim">CLICK THE FLOOR TO ENTER · W FORWARD · S BACK · SHIFT RUN · A/D OR MOUSE TO LOOK · ESC OUT<br>AND YES, THE CHEATS WORK</p>
 </div>
 <div id="xh" hidden></div><div id="fx" hidden></div>
 <button id="gen" hidden>GENERATE</button>
@@ -61,6 +78,7 @@
 const TAU = Math.PI*2, SL = 20, W = 5.2, H = 4.4;
 let WAD, NL, NH, NF, lamps = [], plates = [], rooms = [], coreMat, camera, scene, renderer;
 let god = false, kfa = false, clip = false;
+let LEVEL = null, mode = 'recorded';
 
 fetch('wad.json').then(r=>r.json()).then(w => { WAD = w; build(); });
 
@@ -246,19 +264,14 @@ function graffiti(sinkStat, sector){
     m.position.set(side*(W-0.07), (art?1.6:1.15)+(n%3)*0.8, f*SL+3.5+(n*4.7)%(SL-8));
     m.rotation.y = side<0?Math.PI/2:-Math.PI/2;
     m.rotation.z = (Math.random()-0.5)*0.11;
-    scene.add(m);
+    LEVEL.add(m);
   }
 }
 
 // ---------- level ----------
-function build(){
-  NL = WAD.layers; NH = WAD.heads; NF = NL + 1;
-  const S = WAD.steps;
-  // static architecture: sector brightness = how much this layer stares into nothing, on average
-  const meanSink = l => S.reduce((a,st)=>a + st.l[l][1].reduce((x,y)=>x+y,0)/NH, 0)/S.length;
-  const sinkStat = Array.from({length:NL}, (_,l)=>meanSink(l));
-  const sector = l => 0.09 + 1.0*Math.pow(1 - sinkStat[Math.min(l,NL-1)], 1.7);
+function build(){ initGL(); buildLevel(); run(); }
 
+function initGL(){
   THREE.ColorManagement.enabled = false;
   scene = new THREE.Scene();
   scene.fog = new THREE.FogExp2(0x0a0705, 0.026);
@@ -269,6 +282,21 @@ function build(){
   document.body.appendChild(renderer.domElement);
   addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;
     camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight);});
+}
+
+function buildLevel(){
+  if(LEVEL){ scene.remove(LEVEL);
+    LEVEL.traverse(o=>{ if(o.geometry) o.geometry.dispose();
+      if(o.material){ if(o.material.map) o.material.map.dispose(); o.material.dispose(); } }); }
+  LEVEL = new THREE.Group(); scene.add(LEVEL);
+  lamps = []; plates = []; rooms = []; cur = 0;
+  NL = WAD.layers; NH = WAD.heads; NF = NL + 1;
+  const S = WAD.steps;
+  // static architecture: sector brightness = how much this layer stares into nothing, on average
+  const meanSink = l => S.reduce((a,st)=>a + st.l[l][1].reduce((x,y)=>x+y,0)/NH, 0)/S.length;
+  const sinkStat = Array.from({length:NL}, (_,l)=>meanSink(l));
+  const sector = l => 0.09 + 1.0*Math.pow(1 - sinkStat[Math.min(l,NL-1)], 1.7);
+
 
   const wallTex=tex('wall'), floorTex=tex('floor'), quad=new THREE.PlaneGeometry(1,1);
   const surf=(t,w,h,rep,br,tint)=>{
@@ -282,32 +310,32 @@ function build(){
     const ce=surf(floorTex,W*2,SL,[3,5],br*0.42,t); ce.rotation.x= Math.PI/2; ce.position.set(0,H,z);
     const wl=surf(wallTex,SL,H,[5,1],br,t); wl.rotation.y= Math.PI/2; wl.position.set(-W,H/2,z);
     const wr=surf(wallTex,SL,H,[5,1],br,t); wr.rotation.y=-Math.PI/2; wr.position.set( W,H/2,z);
-    scene.add(fl,ce,wl,wr); rooms.push({m:[fl,ce,wl,wr],br});
+    LEVEL.add(fl,ce,wl,wr); rooms.push({m:[fl,ce,wl,wr],br});
     const zz=f*SL, fr=new THREE.MeshBasicMaterial({map:wallTex.clone()});
     fr.color.setRGB(br*0.55,br*0.5,br*0.44);
     for(const sx of [-1,1]){const m=new THREE.Mesh(new THREE.BoxGeometry(1.5,H,1.1),fr);
-      m.position.set(sx*(W-0.75),H/2,zz); scene.add(m);}
+      m.position.set(sx*(W-0.75),H/2,zz); LEVEL.add(m);}
     const lint=new THREE.Mesh(new THREE.BoxGeometry(W*2,1.3,1.1),fr);
-    lint.position.set(0,H-0.65,zz); scene.add(lint);
+    lint.position.set(0,H-0.65,zz); LEVEL.add(lint);
     const p=makePlate(512,128); drawPlate(p,'',false);
     const pm=new THREE.Mesh(new THREE.PlaneGeometry(7.4,1.68),p.mat);
-    pm.position.set(0,H-0.66,zz-0.58); pm.rotation.y=Math.PI; scene.add(pm); plates.push(p);
+    pm.position.set(0,H-0.66,zz-0.58); pm.rotation.y=Math.PI; LEVEL.add(pm); plates.push(p);
     const np=makePlate(256,64); drawPlate(np,String(f).padStart(2,'0'),false);
     const nm=new THREE.Mesh(new THREE.PlaneGeometry(1.5,0.36),np.mat);
-    nm.position.set(-W+0.06,2.5,zz+1.2); nm.rotation.y=Math.PI/2; scene.add(nm);
+    nm.position.set(-W+0.06,2.5,zz+1.2); nm.rotation.y=Math.PI/2; LEVEL.add(nm);
   }
   // back wall
   { const zEnd=NF*SL;
     const back=surf(wallTex,W*2,H,[5,1],1.0,[1,0.93,0.82]);
-    back.position.set(0,H/2,zEnd); back.rotation.y=Math.PI; scene.add(back);
+    back.position.set(0,H/2,zEnd); back.rotation.y=Math.PI; LEVEL.add(back);
     const p=makePlate(1024,232); drawPlate(p, 'END OF NETWORK', true);
     const pm=new THREE.Mesh(new THREE.PlaneGeometry(8.2,1.86),p.mat);
-    pm.position.set(0,2.4,zEnd-0.06); pm.rotation.y=Math.PI; scene.add(pm); }
+    pm.position.set(0,2.4,zEnd-0.06); pm.rotation.y=Math.PI; LEVEL.add(pm); }
 
   // residual stream
   coreMat = new THREE.MeshBasicMaterial({color:0x24344e});
   const pipe=new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.3,NF*SL,10,1,true),coreMat);
-  pipe.rotation.x=Math.PI/2; pipe.position.set(0,H-0.3,NF*SL/2); scene.add(pipe);
+  pipe.rotation.x=Math.PI/2; pipe.position.set(0,H-0.3,NF*SL/2); LEVEL.add(pipe);
 
   // lamps = attention heads
   const lg=new THREE.SphereGeometry(0.17,8,6);
@@ -321,13 +349,13 @@ function build(){
     for(let h=0;h<NH;h++){
       const side=h%2?1:-1, k=Math.floor(h/2), z=l*SL+2.4+k*(SL-4.8)/(NH/2-1);
       const m=new THREE.Mesh(lg,new THREE.MeshBasicMaterial({color:0x111111}));
-      m.position.set(side*(W-0.22),2.85,z); scene.add(m);
+      m.position.set(side*(W-0.22),2.85,z); LEVEL.add(m);
       const hm=new THREE.Mesh(new THREE.PlaneGeometry(2,2),new THREE.MeshBasicMaterial({
         map:haloTex,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0.4}));
-      hm.position.copy(m.position); scene.add(hm);
+      hm.position.copy(m.position); LEVEL.add(hm);
       const bm=new THREE.Mesh(beamGeo,new THREE.MeshBasicMaterial({transparent:true,opacity:0,
         blending:THREE.AdditiveBlending,depthWrite:false}));
-      bm.rotation.x=Math.PI/2; bm.position.set(side*(W-0.34),2.85,z); scene.add(bm);
+      bm.rotation.x=Math.PI/2; bm.position.set(side*(W-0.34),2.85,z); LEVEL.add(bm);
       row.push({m,hm,bm,z,side});
     } lamps.push(row); }
 
@@ -365,7 +393,112 @@ function showStep(i){
   cur = i;
 }
 
+// ---------- live: run the model here, compile the level as it speaks ----------
+const stat = t => { document.getElementById('mstat').textContent = t; };
+let liveIds = [], sess = null, tokzr = null, lastNext = 0;
+
+async function liveInit(prompt){
+  try{
+    console.log('LIVE stage: runtime'); stat('loading runtime…');
+    if(!window.ort){
+      await new Promise((ok,bad)=>{ const el=document.createElement('script');
+        el.src='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/ort.min.js';
+        el.onload=ok; el.onerror=()=>bad(new Error('onnxruntime-web did not load')); 
+        document.head.appendChild(el); });
+    }
+    if(!tokzr){
+      console.log('LIVE stage: tokenizer'); stat('loading tokenizer…');
+      const T = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.1');
+      tokzr = await T.AutoTokenizer.from_pretrained('HuggingFaceTB/SmolLM2-135M-Instruct');
+    }
+    ort.env.wasm.numThreads = 1;      // no cross-origin isolation on a static Space
+    ort.env.wasm.proxy = false;
+    console.log('ort', ort.env.versions ? ort.env.versions.common : '?');
+    if(!sess){
+      console.log('LIVE stage: model'); stat('downloading the model — 240 MB, once…');
+      const data = await fetch('model/level.q4a.onnx.data').then(r=>r.arrayBuffer());
+      let last;
+      for(const ep of ['webgpu','wasm']){
+        try{
+          sess = await ort.InferenceSession.create('model/level.q4a.onnx', {
+            executionProviders:[ep], externalData:[{data, path:'level.q4a.onnx.data'}] });
+          const probe = await sess.run({input_ids:new ort.Tensor('int64',
+            BigInt64Array.from([1n,2n,3n]), [1,3])});
+          if(!probe.lens_id) throw new Error('no lens_id');
+          console.log('LIVE ep ok:', ep); break;
+        }catch(err){ console.warn('LIVE ep failed:', ep, err); sess = null; last = err; }
+      }
+      if(!sess) throw new Error('no execution provider could run the model ('+last+')');
+    }
+    console.log('LIVE stage: first pass'); stat('compiling the level…');
+    liveIds = Array.from(tokzr.encode(prompt));
+    const first = await liveStep();
+    WAD = {layers:first.NL, heads:first.NH, model:'SmolLM2-135M-Instruct',
+           prompt, said:'', steps:[first.step]};
+    lastNext = first.next;
+    mode = 'live'; buildLevel(); showStep(0);
+    stat('READY — click anywhere to walk in. It keeps writing while you walk.');
+    liveLoop(48);
+  }catch(e){ console.error('LIVE FAILED', e);
+    stat('live mode failed: '+(e && (e.message || e.name || String(e)) || 'unknown')); }
+}
+
+async function liveStep(){
+  const ids = BigInt64Array.from(liveIds.map(BigInt));
+  const r = await sess.run({input_ids:new ort.Tensor('int64', ids, [1, liveIds.length])});
+  const NLl = r.sink.dims[0], NHh = r.sink.dims[1], lnT = Math.log(Math.max(2, liveIds.length));
+  const logits = r.logits.data;
+  let best = 0; for(let i=1;i<logits.length;i++) if(logits[i]>logits[best]) best=i;
+  const f = [], l = [];
+  for(let i=0;i<r.lens_id.data.length;i++)
+    f.push([tokzr.decode([Number(r.lens_id.data[i])]), r.lens_p.data[i]]);
+  for(let a=0;a<NLl;a++){
+    const ent=[], sink=[];
+    for(let h=0;h<NHh;h++){ ent.push(r.ent.data[a*NHh+h]/lnT); sink.push(r.sink.data[a*NHh+h]); }
+    l.push([ent, sink]);
+  }
+  return {NL:NLl, NH:NHh, next:best, step:{t:tokzr.decode([best]), f, l}};
+}
+
+async function liveLoop(n){
+  for(let k=0; k<n && mode==='live'; k++){
+    liveIds.push(lastNext);                 // the token the last state predicted
+    const r = await liveStep();             // one forward pass per token, no KV cache
+    lastNext = r.next;
+    WAD.steps.push(r.step); showStep(WAD.steps.length-1); pulse = 0;
+    sayEl.innerHTML = WAD.steps.map(x=>x.t).join('').slice(-190)
+      .replace(/\n/g,' ').replace(/(\S+\s*)$/,'<b>$1</b>');
+    await new Promise(res=>setTimeout(res,10));
+  }
+}
+
+// ---------- brainscope: the same tunnel, your own model, live ----------
+function bsConnect(base){
+  base = base.replace(/\/+$/,'');
+  const ws = new WebSocket(base.replace(/^http/,'ws') + '/ws');
+  stat('connecting to '+base+' …');
+  ws.onerror = () => stat('brainscope: cannot reach '+base);
+  ws.onopen  = () => stat('connected — send a prompt to brainscope and walk');
+  ws.onmessage = ev => {
+    let p; try{ p = JSON.parse(ev.data); }catch(_){ return; }
+    if(!p.lens || !p.head_entropy) return;
+    const NLl = p.head_entropy.length, NHh = p.head_entropy[0].length;
+    const pick = x => Array.isArray(x) ? [String(x[0]), +x[1]||0]
+                    : [String(x.tok ?? x.t ?? x.token ?? ''), +(x.p ?? x.prob ?? 0)];
+    const f = p.lens.map(row => pick(Array.isArray(row) ? row[0] : row));
+    const l = p.head_entropy.map((ents,i) =>
+      [ents, ents.map(()=> (p.attn_top && p.attn_top[i]===0) ? 0.9 : 0.05)]);
+    if(!WAD || WAD.layers!==NLl || WAD.heads!==NHh || mode!=='bs'){
+      WAD = {layers:NLl, heads:NHh, model:'brainscope', prompt:'', said:'', steps:[{t:'',f,l}]};
+      mode='bs'; buildLevel(); showStep(0);
+      stat('CONNECTED — click anywhere to walk in.');
+    } else { WAD.steps.push({t:p.piece||'', f, l}); showStep(WAD.steps.length-1); pulse=0; }
+    sayEl.innerHTML = WAD.steps.map(x=>x.t).join('').slice(-190);
+  };
+}
+
 // ---------- walking + playback ----------
+const AUTO = /[?&]auto/.test(location.search);   // slow crawl, for recording
 const free=new THREE.Vector3(0,1.72,1.5);
 let z=1.5, yaw=0, pitch=0, bob=0, moving=0, cur=0, playing=false, acc=0, pulse=-1;
 const keys={};
@@ -391,13 +524,34 @@ addEventListener('keydown',e=>{keys[e.code]=true;
   if(/^Key[A-Z]$/.test(e.code)){ cheatBuf=(cheatBuf+e.code.slice(3)).slice(-8).toLowerCase();
     for(const c in CHEATS) if(cheatBuf.endsWith(c)){ cheatMsg(CHEATS[c]()); cheatBuf=''; } }});
 addEventListener('keyup',e=>{keys[e.code]=false;});
+let inGame=false;
+function showGame(on){ inGame=on; document.getElementById('start').hidden=on;
+  for(const id of ['bar','gen','xh','fx','say']) document.getElementById(id).hidden=!on; }
+function enter(){ showGame(true);
+  try{ const r = renderer.domElement.requestPointerLock();
+       if(r && r.catch) r.catch(()=>{}); }catch(_){}   // fine without it
+}
 function run(){
   const start=document.getElementById('start');
-  start.onclick=()=>renderer.domElement.requestPointerLock();
+  start.onclick=e=>{ if(e.target.closest('#modes,#mform')) return; enter(); };
+  const form=document.getElementById('mform'); form.innerHTML='';
+  document.querySelectorAll('.mb').forEach(b=>b.onclick=()=>{
+    document.querySelectorAll('.mb').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); form.innerHTML=''; stat('');
+    const m=b.dataset.m;
+    if(m==='recorded'){ enter(); return; }
+    const inp=document.createElement('input');
+    inp.value = m==='live' ? 'A raindrop lands on a wet window and disappears because'
+                           : 'http://localhost:8010';
+    inp.placeholder = m==='live' ? 'your sentence' : 'brainscope url';
+    const go=document.createElement('button'); go.textContent='GO';
+    go.onclick=()=> m==='live' ? liveInit(inp.value) : bsConnect(inp.value);
+    form.append(inp,go); inp.focus();
+  });
   document.addEventListener('pointerlockchange',()=>{
-    const on=document.pointerLockElement===renderer.domElement;
-    start.hidden=on;
-    for(const id of ['bar','gen','xh','fx','say']) document.getElementById(id).hidden=!on;});
+    if(document.pointerLockElement===renderer.domElement) showGame(true);
+    else if(inGame) showGame(false);          // ESC leaves; no lock = keyboard still works
+  });
   addEventListener('mousemove',e=>{
     if(document.pointerLockElement!==renderer.domElement) return;
     yaw=Math.max(-1.4,Math.min(1.4,yaw-e.movementX*0.0022));
@@ -412,8 +566,11 @@ const floorEl=document.getElementById('floor'), wordEl=document.getElementById('
 let last=performance.now();
 function frame(now){
   const dt=Math.min(0.05,(now-last)/1000); last=now;
-  const fwd=(keys.KeyW||keys.ArrowUp?1:0)-(keys.KeyS||keys.ArrowDown?1:0);
-  const sp=(keys.ShiftLeft||keys.ShiftRight?14:6.6);
+  const fwd=(keys.KeyW||keys.ArrowUp?1:0)-(keys.KeyS||keys.ArrowDown?1:0)||(AUTO?1:0);
+  if(!inGame){ renderer.render(scene,camera); requestAnimationFrame(frame); return; }
+  const turn=(keys.ArrowLeft||keys.KeyA?1:0)-(keys.ArrowRight||keys.KeyD?1:0);
+  if(turn) yaw=Math.max(-1.4,Math.min(1.4, yaw+turn*1.6*dt));
+  const sp=(keys.ShiftLeft||keys.ShiftRight?14:(AUTO?3.4:6.6));
   moving+=((fwd?1:0)-moving)*Math.min(1,dt*9); bob+=dt*sp*1.05*(fwd?1:0);
   if(clip){
     const d=new THREE.Vector3(); camera.getWorldDirection(d);
@@ -448,6 +605,7 @@ function frame(now){
   const sk=WAD.steps[cur].l[Math.min(f,NL-1)][1];
   sinkEl.textContent=(sk.reduce((a,b)=>a+b,0)/NH*100).toFixed(0)+'%';
   for(const row of lamps) for(const L of row) L.hm.lookAt(camera.position);
+  document.body.dataset.dbg = JSON.stringify({z:+z.toFixed(1), inGame, AUTO, playing, cur, NF, fwd});
   renderer.render(scene,camera);
   requestAnimationFrame(frame);
 }
