@@ -729,10 +729,14 @@ const CHEATS = {
     }
     return 'DEGREELESSNESS MODE '+(god?'ON':'OFF')+' — sector lighting was the attention sink'; },
   idkfa: ()=>{ kfa=!kfa; showStep(cur);
-    return kfa ? 'VERY HAPPY AMMO ADDED — every head now shows its beam, every door its probability'
+    return kfa ? 'VERY HAPPY AMMO ADDED — every door now shows its probability and its runner-up'
                : 'AMMO REVOKED'; },
   idclip: ()=>{ clip=!clip;
-    return 'NO CLIPPING MODE '+(clip?'ON':'OFF')+(clip?' — leave the tunnel, look at the net from outside':''); },
+    // outside a one-sided tunnel there is nothing to see, so take the shell
+    // away instead: from out here the whole network lies in one row
+    for(const r of rooms){ r.m[1].visible=!clip; r.m[2].visible=!clip; r.m[3].visible=!clip; }
+    return 'NO CLIPPING MODE '+(clip?'ON':'OFF')
+      +(clip?' — walls off, the whole network in one row':''); },
   iddt:  ()=>{ pitch=-1.2; return 'FULL MAP — look down'; },
 };
 let cheatBuf='';
