@@ -341,10 +341,10 @@ function graffiti(sinkStat, sector){
     const br=1;
     const art=kind==='a';
     const m=new THREE.Mesh(
-      new THREE.PlaneGeometry(art?2.3:5.8, art?1.15:1.14),
+      new THREE.PlaneGeometry(art?1.9:6.4, art?0.95:0.95),
       art ? sprayArt(val) : sprayText(val));
     m.material.color.setRGB(br,br,br);
-    m.position.set(side*(W-0.07), 1.16+(n%2)*0.30, f*SL+3.5+(n*4.7)%(SL-8));
+    m.position.set(side*(W-0.07), 3.62, f*SL+3.5+(n*4.7)%(SL-8));
     m.rotation.y = side<0?Math.PI/2:-Math.PI/2;
     m.rotation.z = (Math.random()-0.5)*0.11;
     LEVEL.add(m);
