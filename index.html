@@ -190,7 +190,7 @@ const sprayText = (txt)=>{
     x.save();
     x.translate(px+cw/2, h/2 + (Math.random()-0.5)*fs*0.10);
     x.rotate((Math.random()-0.5)*0.055);
-    x.fillStyle='rgba(9,7,5,'+(0.62+Math.random()*0.16)+')';
+    x.fillStyle='rgba(11,8,6,'+(0.84+Math.random()*0.14)+')';
     x.fillText(ch, -cw/2, 0);
     x.restore();
     px += cw;
@@ -331,7 +331,7 @@ function graffiti(sinkStat, sector){
     const br=1;
     const art=kind==='a';
     const m=new THREE.Mesh(
-      new THREE.PlaneGeometry(art?1.9:4.7, art?0.95:0.92),
+      new THREE.PlaneGeometry(art?2.3:5.8, art?1.15:1.14),
       art ? sprayArt(val) : sprayText(val));
     m.material.color.setRGB(br,br,br);
     m.position.set(side*(W-0.07), 1.16+(n%2)*0.30, f*SL+3.5+(n*4.7)%(SL-8));
@@ -551,8 +551,8 @@ function showStep(i){
     x.fillStyle='rgba(6,10,16,.72)'; x.fillRect(0,0,w,hgt);
     x.font='bold 40px ui-monospace,Menlo,monospace'; x.textBaseline='middle';
     let px=8;
-    x.fillStyle='#3f6b8a'; x.fillText('RESIDUAL STREAM h', px, hgt/2);
-    px += x.measureText('RESIDUAL STREAM h').width + 34;
+    x.fillStyle='#3f6b8a'; const lab='RESIDUAL STREAM h \u2014 biggest #dimension, value';
+    x.fillText(lab, px, hgt/2); px += x.measureText(lab).width + 34;
     for(const [d,v] of (st.r[l]||[])){
       const big=Math.abs(v)>50;
       x.fillStyle = big ? '#ff9b2a' : '#5f87a6';
@@ -568,8 +568,8 @@ function showStep(i){
       y.fillStyle='rgba(14,8,6,.72)'; y.fillRect(0,0,ww,hh);
       y.font='bold 40px ui-monospace,Menlo,monospace'; y.textBaseline='middle';
       let qx=8;
-      y.fillStyle='#7a4a30'; y.fillText('MLP NEURONS', qx, hh/2);
-      qx += y.measureText('MLP NEURONS').width + 34;
+      y.fillStyle='#7a4a30'; const lab2='MLP NEURONS \u2014 loudest #neuron, value';
+      y.fillText(lab2, qx, hh/2); qx += y.measureText(lab2).width + 34;
       for(const [d,v] of (st.n[l]||[])){
         const loud=Math.abs(v)>12;
         y.fillStyle = loud ? '#ff7a45' : '#8a6a55';
@@ -752,6 +752,7 @@ const HINTS = [
   'each window is one attention head — that is its own attention matrix',
   'the blue numbers are the residual stream, the orange ones are MLP neurons',
   'over every door: the word this layer would say next',
+  'ATTN and MLP under it: how much each half of the layer just added',
 ];
 function hint(){
   const el=document.getElementById('hintline'); let i=0;
