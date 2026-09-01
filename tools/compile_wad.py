@@ -40,6 +40,10 @@ def cap(name):
 for l, blk in enumerate(model.model.layers):
     blk.self_attn.register_forward_hook(cap(f"a{l}"))
     blk.mlp.register_forward_hook(cap(f"m{l}"))
+    def pre(name):
+        def h(mod, args): grab[name] = args[0]
+        return h
+    blk.mlp.down_proj.register_forward_pre_hook(pre(f"n{l}"))
 
 # 2) ONE teacher-forced pass over the finished sequence gives every internal
 #    state we need — identical to greedy decoding, 200x cheaper.
@@ -62,6 +66,12 @@ for t in range(len(gen_ids)):
     for l in range(L):
         add.append([round(float(grab[f"a{l}"][0, q].norm()), 1),
                     round(float(grab[f"m{l}"][0, q].norm()), 1)])
+    # the eight loudest neurons in each MLP, with their indices
+    neu = []
+    for l in range(L):
+        v = grab[f"n{l}"][0, q]
+        _, i = v.abs().topk(8)
+        neu.append([[int(j), round(float(v[j]), 1)] for j in i.tolist()])
     res = []
     for l in range(L + 1):
         h = o.hidden_states[l][0, q]
@@ -77,7 +87,7 @@ for t in range(len(gen_ids)):
         lights.append([[round(x,2) for x in ent.tolist()],
                        [round(x,2) for x in a[:,0].tolist()],
                        [int(b) for b in back]])
-    steps.append({"t": tok.decode([gen_ids[t]]), "f": floors, "l": lights, "r": res, "a": add})
+    steps.append({"t": tok.decode([gen_ids[t]]), "f": floors, "l": lights, "r": res, "a": add, "n": neu})
 
 # ---- one stained-glass window per head: its whole attention matrix ----
 # max-pooled to 32x32 (max, not mean: it keeps the thin diagonals and the
@@ -109,6 +119,9 @@ for t in range(0, len(steps), max(1, len(steps)//24)):
     hit = next((l for l,(w,p) in enumerate(s["f"]) if w == want), None)
     print(f"  step {t:>3} {want!r:<12} surfaces at floor {hit}")
 sink = [sum(sum(st['l'][l][1])/H for st in steps)/len(steps) for l in range(L)]
+print("\n== loudest MLP neurons (step 0) ==")
+for l in range(0, L, 4):
+    print(f"  layer {l:>2}: " + "  ".join(f"#{d}:{v:.0f}" for d, v in steps[0]["n"][l][:5]))
 print("\n== what each half of the block adds (step 0: |attn| / |mlp|) ==")
 for l in range(0, L, 3):
     a_, m_ = steps[0]["a"][l]

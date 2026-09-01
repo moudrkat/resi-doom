@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>RESI-DOOM</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600&display=swap">
 <style>
   :root{color-scheme:dark}
   html,body{margin:0;height:100%;background:#000;overflow:hidden;
@@ -18,7 +20,7 @@
     text-shadow:0 0 10px #000,0 0 22px #1a4a7a;padding:0 12vw;min-height:2.6em}
   #say b{color:#fff;font-weight:400}
   #bar{position:fixed;left:0;right:0;bottom:0;z-index:4;pointer-events:none;
-    display:grid;grid-template-columns:auto auto 1fr auto;align-items:stretch;gap:14px;
+    display:grid;grid-template-columns:auto auto auto 1fr auto;align-items:stretch;gap:14px;
     padding:10px 16px 12px;background:linear-gradient(#0000,#0a0806 55%);border-top:1px solid #241d14}
   .cell{border:1px solid #2c2318;background:#100c08;padding:6px 14px}
   .k{font-size:9px;letter-spacing:3px;color:#6b5a3f;display:block;margin-bottom:3px}
@@ -74,17 +76,20 @@
 <div id="bar" hidden>
   <div class="cell"><span class="k">LAYER</span><div id="floor">00</div></div>
   <div class="cell"><span class="k">TOKEN</span><div id="tok">0</div></div>
+  <div class="cell" style="padding:6px 10px"><span class="k">WHERE YOU ARE IN THE MODEL</span><canvas id="map" width="620" height="30" style="display:block;width:310px;height:15px"></canvas></div>
   <div class="cell"><span class="k">WHAT THIS LAYER THINKS THE NEXT WORD IS</span><div id="word">&nbsp;</div></div>
-  <div class="cell"><span class="k">ATTENTION INTO NOTHING</span><div id="sink">0%</div></div>
+  <div class="cell"><span class="k">ATTENTION ONTO TOKEN 0</span><div id="sink">0%</div></div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
 <script>
 const TAU = Math.PI*2, SL = 20, W = 5.2, H = 4.4;
-let WAD, NL, NH, NF, lamps = [], plates = [], rooms = [], ticker = [], adds = [], camera, scene, renderer;
+let WAD, NL, NH, NF, lamps = [], plates = [], rooms = [], ticker = [], neuron = [], adds = [], camera, scene, renderer;
 let god = false, kfa = false, clip = false;
-let LEVEL = null, mode = 'recorded';
+let LEVEL = null, mode = 'recorded', sinkOf = ()=>0;
 
-fetch('wad.json').then(r=>r.json()).then(w => { WAD = w; build(); });
+Promise.all([fetch('wad.json').then(r=>r.json()),
+  (document.fonts ? document.fonts.load("600 60px Caveat").catch(()=>{}) : 0)])
+  .then(([w]) => { WAD = w; build(); });
 
 // ---------- textures ----------
 function tex(kind){
@@ -120,40 +125,51 @@ function drawPlate(p, txt, hot){
 
 
 // ---------- graffiti: stencils and slogans, sprayed where they are true ----------
-function sprayed(draw, hue, w, h){
+function sprayed(draw, w, h){
   const art=document.createElement('canvas'); art.width=w; art.height=h;
   draw(art.getContext('2d'), w, h);                       // solid white artwork
   const c=document.createElement('canvas'); c.width=w; c.height=h;
   const x=c.getContext('2d');
-  for(let i=0;i<24;i++){                                  // stamped, never a clean edge
-    x.globalAlpha=0.040+Math.random()*0.042;
+  for(let i=0;i<10;i++){                                  // charcoal, not paint
+    x.globalAlpha=0.055+Math.random()*0.035;
     x.drawImage(art,(Math.random()-.5)*6,(Math.random()-.5)*6);
   }
   x.globalCompositeOperation='source-in';                 // tint the whole stamp
-  x.globalAlpha=1; x.fillStyle='hsl('+hue+',62%,60%)'; x.fillRect(0,0,w,h);
+  x.globalAlpha=1; x.fillStyle='rgba(12,9,7,0.82)'; x.fillRect(0,0,w,h);
   x.globalCompositeOperation='source-over';
   const m=x.getImageData(0,0,w,h);                        // overspray
   for(let i=0;i<1500;i++){
     const px=Math.random()*w|0, py=Math.random()*h|0;
     if(m.data[(py*w+px)*4+3]<12) continue;
-    x.fillStyle='hsla('+hue+',70%,62%,'+(0.05+Math.random()*0.13)+')';
+    x.fillStyle='rgba(12,9,7,'+(0.04+Math.random()*0.08)+')';
     x.fillRect(px+(Math.random()-.5)*26, py+(Math.random()-.5)*18, 1.7,1.7);
-  }
-  for(let i=0;i<10;i++){                                  // drips
-    const px=20+Math.random()*(w-40), py=h*0.45+Math.random()*h*0.2;
-    x.fillStyle='hsla('+hue+',70%,55%,'+(0.10+Math.random()*0.15)+')';
-    x.fillRect(px,py,1.8,12+Math.random()*44);
   }
   return new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c),
     transparent:true, depthWrite:false});
 }
-const sprayText = (txt,hue)=> sprayed((x,w,h)=>{
-  x.fillStyle='#fff'; x.textAlign='center'; x.textBaseline='middle';
-  let fs=104; x.font='bold '+fs+'px Impact,"Arial Black",sans-serif';
-  while(x.measureText(txt).width>w-46 && fs>13){fs-=3;
-    x.font='bold '+fs+'px Impact,"Arial Black",sans-serif';}
-  x.fillText(txt,w/2,h/2);
-}, hue, 1024, 180);
+const sprayText = (txt)=>{
+  // someone wrote this on the wall with a marker: one pass, thin, nearly black,
+  // letters wandering off the baseline. It must not compete with the windows.
+  const w=1024, h=200, c=document.createElement('canvas'); c.width=w; c.height=h;
+  const x=c.getContext('2d');
+  let fs=96; const font=n=>'600 '+n+'px Caveat, "Segoe Script", "Bradley Hand", cursive';
+  x.font=font(fs);
+  while(x.measureText(txt).width>w-60 && fs>18){ fs-=3; x.font=font(fs); }
+  const total=x.measureText(txt).width;
+  let px=(w-total)/2;
+  for(const ch of txt){
+    const cw=x.measureText(ch).width;
+    x.save();
+    x.translate(px+cw/2, h/2 + (Math.random()-0.5)*fs*0.10);
+    x.rotate((Math.random()-0.5)*0.055);
+    x.fillStyle='rgba(9,7,5,'+(0.62+Math.random()*0.16)+')';
+    x.fillText(ch, -cw/2, 0);
+    x.restore();
+    px += cw;
+  }
+  return new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c),
+    transparent:true, depthWrite:false});
+};
 
 // stencils — each one is a thing the tunnel actually does
 const ART = {
@@ -195,7 +211,7 @@ const ART = {
     for(let i=-h;i<w;i+=54){ x.beginPath(); x.moveTo(i,h); x.lineTo(i+h,0);
       x.lineTo(i+h+26,0); x.lineTo(i+26,h); x.fill(); } },
 };
-const sprayArt = (k,hue)=> sprayed(ART[k], hue, 512, 256);
+const sprayArt = (k)=> sprayed(ART[k], 512, 256);
 
 // A sigil for one layer, drawn from its own numbers: a spoke per head, long
 // where the head is sharp, crossed where it stares into the first token.
@@ -284,14 +300,13 @@ function graffiti(sinkStat, sector){
   const seen={};
   for(const [lf,kind,val,hue] of G){
     const f=L(lf), n=(seen[f]=(seen[f]||0)+1), side=n%2?-1:1;
-    const br=Math.min(1,0.34+sector(Math.min(f,NLl-1))*0.9);
-    const glyph=kind==='g', art=kind==='a';
-    const gl = glyph ? (WAD.steps[0].l[Math.min(f,NLl-1)] || [[],[]]) : null;
+    const br=1;
+    const art=kind==='a';
     const m=new THREE.Mesh(
-      new THREE.PlaneGeometry(glyph?2.4:(art?2.6:6.6), glyph?2.4:(art?1.3:1.16)),
-      glyph ? sprayGlyph(gl[0], gl[1], hue) : art ? sprayArt(val,hue) : sprayText(val,hue));
+      new THREE.PlaneGeometry(art?1.9:4.7, art?0.95:0.92),
+      art ? sprayArt(val) : sprayText(val));
     m.material.color.setRGB(br,br,br);
-    m.position.set(side*(W-0.07), 1.34+(n%2)*0.42, f*SL+3.5+(n*4.7)%(SL-8));
+    m.position.set(side*(W-0.07), 1.16+(n%2)*0.30, f*SL+3.5+(n*4.7)%(SL-8));
     m.rotation.y = side<0?Math.PI/2:-Math.PI/2;
     m.rotation.z = (Math.random()-0.5)*0.11;
     LEVEL.add(m);
@@ -319,12 +334,13 @@ function buildLevel(){
     LEVEL.traverse(o=>{ if(o.geometry) o.geometry.dispose();
       if(o.material){ if(o.material.map) o.material.map.dispose(); o.material.dispose(); } }); }
   LEVEL = new THREE.Group(); scene.add(LEVEL);
-  lamps = []; plates = []; rooms = []; ticker = []; adds = []; cur = 0;
+  lamps = []; plates = []; rooms = []; ticker = []; neuron = []; adds = []; cur = 0;
   NL = WAD.layers; NH = WAD.heads; NF = NL + 1;
   const S = WAD.steps;
   // static architecture: sector brightness = how much this layer stares into nothing, on average
   const meanSink = l => S.reduce((a,st)=>a + st.l[l][1].reduce((x,y)=>x+y,0)/NH, 0)/S.length;
   const sinkStat = Array.from({length:NL}, (_,l)=>meanSink(l));
+  sinkOf = l => sinkStat[l];
   const sector = l => 0.09 + 1.0*Math.pow(1 - sinkStat[Math.min(l,NL-1)], 1.7);
 
 
@@ -355,7 +371,8 @@ function buildLevel(){
       const am=new THREE.Mesh(new THREE.PlaneGeometry(4.6,0.58),ap.mat);
       am.position.set(0,H-1.62,zz-0.58); am.rotation.y=Math.PI; LEVEL.add(am); adds.push(ap);
     } else adds.push(null);
-    const np=makePlate(256,64); drawPlate(np,String(f).padStart(2,'0'),false);
+    const cap = f===0 ? 'EMBEDDING' : 'LAYER '+String(f).padStart(2,'0');
+    const np=makePlate(256,64); drawPlate(np,cap,false);
     const nm=new THREE.Mesh(new THREE.PlaneGeometry(1.5,0.36),np.mat);
     nm.position.set(-W+0.06,2.5,zz+1.2); nm.rotation.y=Math.PI/2; LEVEL.add(nm);
   }
@@ -363,7 +380,7 @@ function buildLevel(){
   { const zEnd=NF*SL;
     const back=surf(wallTex,W*2,H,[5,1],1.0,[1,0.93,0.82]);
     back.position.set(0,H/2,zEnd); back.rotation.y=Math.PI; LEVEL.add(back);
-    const p=makePlate(1024,232); drawPlate(p, 'END OF NETWORK', true);
+    const p=makePlate(1024,232); drawPlate(p, 'RMSNORM \u2192 UNEMBEDDING', true);
     const pm=new THREE.Mesh(new THREE.PlaneGeometry(8.2,1.86),p.mat);
     pm.position.set(0,2.4,zEnd-0.06); pm.rotation.y=Math.PI; LEVEL.add(pm); }
 
@@ -394,7 +411,8 @@ function buildLevel(){
       const z=l*SL+2.6+k*(SL-5.2)/(NH/2-1);
       const fm=new THREE.Mesh(frameGeo,new THREE.MeshBasicMaterial({color:0x140f0a}));
       const g =new THREE.Mesh(glassGeo,new THREE.MeshBasicMaterial({
-        map:paneTex(WAD.panes[l][h]), transparent:true, opacity:1}));
+        map: WAD.panes ? paneTex(WAD.panes[l][h]) : null,
+        color: WAD.panes ? 0xffffff : 0x241a12, transparent:true, opacity:1}));
       for(const m of [fm,g]){ m.position.set(side*(W-0.05),2.35,z);
         m.rotation.y = side<0?Math.PI/2:-Math.PI/2; }
       g.position.x = side*(W-0.09);
@@ -417,10 +435,22 @@ function buildLevel(){
     const mat=new THREE.MeshBasicMaterial({map:t, transparent:true});
     for(const side of [-1,1]){
       const m=new THREE.Mesh(new THREE.PlaneGeometry(SL,0.62),mat);
-      m.position.set(side*(W-0.04),0.72,l*SL+SL/2);
+      m.position.set(side*(W-0.04),0.66,l*SL+SL/2);
       m.rotation.y = side<0?Math.PI/2:-Math.PI/2; LEVEL.add(m);
     }
     ticker.push({c, x:c.getContext('2d'), t});
+    if(l<NL && WAD.steps[0].n){     // the MLP is not a black box either
+      const c2=document.createElement('canvas'); c2.width=TW; c2.height=TH;
+      const t2=new THREE.CanvasTexture(c2);
+      t2.wrapS=THREE.RepeatWrapping; t2.repeat.set(4,1);
+      const m2=new THREE.MeshBasicMaterial({map:t2, transparent:true});
+      for(const side of [-1,1]){
+        const m=new THREE.Mesh(new THREE.PlaneGeometry(SL,0.62),m2);
+        m.position.set(side*(W-0.04),0.20,l*SL+SL/2);
+        m.rotation.y = side<0?Math.PI/2:-Math.PI/2; LEVEL.add(m);
+      }
+      neuron.push({c:c2, x:c2.getContext('2d'), t:t2});
+    } else neuron.push(null);
   }
 
   graffiti(sinkStat, sector);
@@ -435,34 +465,36 @@ function buildLevel(){
 function showStep(i){
   const st = WAD.steps[i], want = st.t;
   for(let f=0; f<NF; f++){
-    const [w,p] = st.f[f];
+    const [w,p] = st.f[f] || ['',0];
     drawPlate(plates[f], ((w||'').replace(/\n/g,'⏎').trim()||'␣')+(kfa?'  '+p.toFixed(2):''),
               w===want && p>0.25);
   }
   // The matrix rows are positions in the text, so at token i only the top of
   // the window exists yet. The glass fills in as the model writes.
-  const frac = Math.min(1, (WAD.n_prompt + i + 1) / (WAD.n_prompt + WAD.steps.length));
+  const frac = WAD.panes ? Math.min(1, (WAD.n_prompt + i + 1) / (WAD.n_prompt + WAD.steps.length)) : 1;
   for(let l=0;l<NL;l++){
-    const [ent,sink] = st.l[l];
+    const [ent,sink] = st.l[l] || [[],[]];
     for(let h=0;h<NH;h++){
       const G = lamps[l][h];
-      G.g.material.opacity = 0.34 + 0.66*(1-ent[h]);            // sharp head = bright glass
+      G.g.material.opacity = 0.34 + 0.66*(1-(ent[h]??0.5));            // sharp head = bright glass
       const t = G.g.material.map;
-      t.repeat.set(1, frac); t.offset.set(0, 1-frac);
+      if(t){ t.repeat.set(1, frac); t.offset.set(0, 1-frac); }
       G.g.scale.y = frac; G.g.position.y = G.top - 1.06*frac/2;
     }
   }
-  for(let l=0;l<NL;l++){
+  if(st.a) for(let l=0;l<NL;l++){
     const [av,mv] = st.a[l];
     drawPlate(adds[l], 'ATTN '+av.toFixed(0)+'   MLP '+mv.toFixed(0), false);
   }
-  for(let l=0;l<NF;l++){                                          // the stream, in numbers
+  if(st.r) for(let l=0;l<NF;l++){                                 // the stream, in numbers
     const T=ticker[l], x=T.x, w=T.c.width, hgt=T.c.height;
     x.clearRect(0,0,w,hgt);
     x.fillStyle='rgba(6,10,16,.72)'; x.fillRect(0,0,w,hgt);
     x.font='bold 40px ui-monospace,Menlo,monospace'; x.textBaseline='middle';
     let px=8;
-    for(const [d,v] of st.r[l]){
+    x.fillStyle='#3f6b8a'; x.fillText('RESIDUAL STREAM h', px, hgt/2);
+    px += x.measureText('RESIDUAL STREAM h').width + 34;
+    for(const [d,v] of (st.r[l]||[])){
       const big=Math.abs(v)>50;
       x.fillStyle = big ? '#ff9b2a' : '#5f87a6';
       x.fillText('#'+d, px, hgt/2); px += x.measureText('#'+d).width + 7;
@@ -471,6 +503,24 @@ function showStep(i){
       x.fillText(t, px, hgt/2); px += x.measureText(t).width + 26;
     }
     T.t.needsUpdate = true;
+    if(neuron[l]){
+      const N=neuron[l], y=N.x, ww=N.c.width, hh=N.c.height;
+      y.clearRect(0,0,ww,hh);
+      y.fillStyle='rgba(14,8,6,.72)'; y.fillRect(0,0,ww,hh);
+      y.font='bold 40px ui-monospace,Menlo,monospace'; y.textBaseline='middle';
+      let qx=8;
+      y.fillStyle='#7a4a30'; y.fillText('MLP NEURONS', qx, hh/2);
+      qx += y.measureText('MLP NEURONS').width + 34;
+      for(const [d,v] of (st.n[l]||[])){
+        const loud=Math.abs(v)>12;
+        y.fillStyle = loud ? '#ff7a45' : '#8a6a55';
+        y.fillText('n'+d, qx, hh/2); qx += y.measureText('n'+d).width + 7;
+        y.fillStyle = loud ? '#ffd0b0' : '#c0a08a';
+        const tx=(v>0?'+':'')+v.toFixed(1);
+        y.fillText(tx, qx, hh/2); qx += y.measureText(tx).width + 26;
+      }
+      N.t.needsUpdate = true;
+    }
   }
   cur = i;
 }
@@ -568,13 +618,20 @@ function bsConnect(base){
     const pick = x => Array.isArray(x) ? [String(x[0]), +x[1]||0]
                     : [String(x.tok ?? x.t ?? x.token ?? ''), +(x.p ?? x.prob ?? 0)];
     const f = p.lens.map(row => pick(Array.isArray(row) ? row[0] : row));
+    // brainscope now streams per-head sink and the residual components too;
+    // fall back to attn_top for older servers
     const l = p.head_entropy.map((ents,i) =>
-      [ents, ents.map(()=> (p.attn_top && p.attn_top[i]===0) ? 0.9 : 0.05)]);
+      [ents, p.head_sink ? p.head_sink[i]
+                         : ents.map(()=> (p.attn_top && p.attn_top[i]===0) ? 0.9 : 0.05)]);
+    const r = p.res || null;
     if(!WAD || WAD.layers!==NLl || WAD.heads!==NHh || mode!=='bs'){
-      WAD = {layers:NLl, heads:NHh, model:'brainscope', prompt:'', said:'', steps:[{t:'',f,l}]};
+      WAD = {layers:NLl, heads:NHh, model:'brainscope', prompt:'', said:'',
+             panes:null, n_prompt:0, steps:[{t:'',f,l,r}]};
       mode='bs'; buildLevel(); showStep(0);
-      stat('CONNECTED — click anywhere to walk in.');
-    } else { WAD.steps.push({t:p.piece||'', f, l}); showStep(WAD.steps.length-1); pulse=0; }
+      stat('CONNECTED to '+NLl+' layers × '+NHh+' heads. Its stream carries the lens and '+
+           'per-head entropy, the sink and the residual components — not the '+
+           'matrices or the MLP neurons, so those stay blank. Click to walk in.');
+    } else { WAD.steps.push({t:p.piece||'', f, l, r}); showStep(WAD.steps.length-1); pulse=0; }
     sayEl.innerHTML = WAD.steps.map(x=>x.t).join('').slice(-190);
   };
 }
@@ -650,6 +707,19 @@ function run(){
   tick();
 }
 const tokEl=document.getElementById('tok');
+const mapEl=document.getElementById('map'), mapX=mapEl.getContext('2d');
+function drawMap(here){
+  const w=mapEl.width, h=mapEl.height, n=NF, bw=w/n;
+  mapX.clearRect(0,0,w,h);
+  for(let i=0;i<n;i++){
+    const sink = sinkOf(Math.min(i,NL-1));
+    const v = 0.16 + 0.62*(1-sink);                 // same lighting as the corridor
+    mapX.fillStyle = i===here ? '#ffb03a' : `rgba(${Math.round(210*v)},${Math.round(180*v)},${Math.round(130*v)},.95)`;
+    mapX.fillRect(i*bw+1, i===here?0:5, bw-2, i===here?h:h-10);
+  }
+  mapX.fillStyle='#6b5a3f'; mapX.font='11px ui-monospace,monospace';
+  mapX.fillText('in', 2, h-1); mapX.textAlign='right'; mapX.fillText('out', w-2, h-1); mapX.textAlign='left';
+}
 const floorEl=document.getElementById('floor'), wordEl=document.getElementById('word'),
       sinkEl=document.getElementById('sink'), sayEl=document.getElementById('say');
 let last=performance.now(), lastRun=0;
@@ -691,11 +761,13 @@ function frame(now){
   const f=Math.max(0,Math.min(NF-1,Math.floor(z/SL)));
   floorEl.textContent=String(f).padStart(2,'0');
   tokEl.textContent=(cur+1)+'/'+WAD.steps.length;
-  const [w,p]=WAD.steps[cur].f[f];
+  drawMap(f);
+  const [w,p]=WAD.steps[cur].f[f] || ['',0];
   wordEl.textContent=(w||'').replace(/\n/g,'⏎')||'␣';
-  const sk=WAD.steps[cur].l[Math.min(f,NL-1)][1];
+  const sk=(WAD.steps[cur].l[Math.min(f,NL-1)]||[[],[0]])[1];
   sinkEl.textContent=(sk.reduce((a,b)=>a+b,0)/NH*100).toFixed(0)+'%';
   for(const T of ticker) T.t.offset.x = (T.t.offset.x - dt*0.85) % 1;
+  for(const N of neuron) if(N) N.t.offset.x = (N.t.offset.x + dt*0.55) % 1;
   renderer.render(scene,camera);
   tick();
 }
