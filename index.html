@@ -31,7 +31,8 @@
     letter-spacing:3px;cursor:pointer}
   #gen:hover{background:#241708;border-color:#ffb03a}
   #start{position:fixed;inset:0;z-index:9;display:flex;flex-direction:column;
-    align-items:center;justify-content:center;background:#08060a;cursor:pointer;text-align:center}
+    align-items:center;justify-content:center;cursor:pointer;text-align:center;
+    background:radial-gradient(ellipse at 50% 45%,rgba(8,6,10,.94),rgba(8,6,10,.80))}
   #start h1{font-size:15px;letter-spacing:10px;margin:0 0 14px;color:#ffb03a;font-weight:400}
   #start p{margin:0 0 8px;font-size:12.5px;color:#7d6a4c;letter-spacing:.5px;max-width:52ch;line-height:1.8}
   #start .dim{color:#3b3128;margin-top:20px;font-size:11px;letter-spacing:2px}
@@ -563,7 +564,10 @@ function enter(){ showGame(true);
   try{ const r = renderer.domElement.requestPointerLock();
        if(r && r.catch) r.catch(()=>{}); }catch(_){}   // fine without it
 }
+let started=false;
 function run(){
+  if(started) return;   // buildLevel may run again on a mode switch
+  started=true;
   const start=document.getElementById('start');
   start.onclick=e=>{ if(e.target.closest('#modes,#mform')) return; enter(); };
   const form=document.getElementById('mform'); form.innerHTML='';
@@ -598,8 +602,7 @@ const floorEl=document.getElementById('floor'), wordEl=document.getElementById('
 let last=performance.now();
 function frame(now){
   const dt=Math.min(0.05,(now-last)/1000); last=now;
-  const fwd=(keys.KeyW||keys.ArrowUp?1:0)-(keys.KeyS||keys.ArrowDown?1:0)||(AUTO?1:0);
-  if(!inGame){ renderer.render(scene,camera); requestAnimationFrame(frame); return; }
+  const fwd=inGame ? ((keys.KeyW||keys.ArrowUp?1:0)-(keys.KeyS||keys.ArrowDown?1:0)||(AUTO?1:0)) : 0;
   const turn=(keys.ArrowLeft||keys.KeyA?1:0)-(keys.ArrowRight||keys.KeyD?1:0);
   if(turn) yaw=Math.max(-1.4,Math.min(1.4, yaw+turn*1.6*dt));
   const sp=(keys.ShiftLeft||keys.ShiftRight?14:(AUTO?3.4:6.6));
