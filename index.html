@@ -39,6 +39,9 @@
   #start h1{font-size:15px;letter-spacing:10px;margin:0 0 14px;color:#ffb03a;font-weight:400}
   #start p{margin:0 0 8px;font-size:12.5px;color:#7d6a4c;letter-spacing:.5px;max-width:52ch;line-height:1.8}
   #start .dim{color:#3b3128;margin-top:20px;font-size:11px;letter-spacing:2px}
+  #hintline{position:fixed;left:0;right:0;top:64px;z-index:6;text-align:center;font-size:13px;
+    letter-spacing:1px;color:#cbb08a;text-shadow:0 0 12px #000,0 0 22px #000;opacity:0;
+    transition:opacity 1.2s;pointer-events:none}
   #cheat{position:fixed;left:0;right:0;top:16px;z-index:6;text-align:center;font-size:13px;
     letter-spacing:2px;color:#9dff7a;text-shadow:0 0 12px #000;opacity:0;transition:opacity .5s;
     pointer-events:none}
@@ -72,6 +75,7 @@
 <div id="xh" hidden></div><div id="fx" hidden></div>
 <button id="gen" hidden>GENERATE</button>
 <div id="cheat"></div>
+<div id="hintline"></div>
 <div id="say" hidden></div>
 <div id="bar" hidden>
   <div class="cell"><span class="k">LAYER</span><div id="floor">00</div></div>
@@ -462,9 +466,13 @@ function buildLevel(){
 }
 
 // ---------- what the model is doing right now ----------
+const NEAR = 4;                       // chambers repainted per token
 function showStep(i){
   const st = WAD.steps[i], want = st.t;
+  const here = Math.max(0, Math.min(NF-1, Math.floor((Number.isFinite(z)?z:0)/SL)));
+  const near = f => Math.abs(f - here) <= NEAR;
   for(let f=0; f<NF; f++){
+    if(!near(f)) continue;
     const [w,p] = st.f[f] || ['',0];
     drawPlate(plates[f], ((w||'').replace(/\n/g,'⏎').trim()||'␣')+(kfa?'  '+p.toFixed(2):''),
               w===want && p>0.25);
@@ -473,6 +481,7 @@ function showStep(i){
   // the window exists yet. The glass fills in as the model writes.
   const frac = WAD.panes ? Math.min(1, (WAD.n_prompt + i + 1) / (WAD.n_prompt + WAD.steps.length)) : 1;
   for(let l=0;l<NL;l++){
+    if(!near(l)) continue;
     const [ent,sink] = st.l[l] || [[],[]];
     for(let h=0;h<NH;h++){
       const G = lamps[l][h];
@@ -483,10 +492,12 @@ function showStep(i){
     }
   }
   if(st.a) for(let l=0;l<NL;l++){
+    if(!near(l)) continue;
     const [av,mv] = st.a[l];
     drawPlate(adds[l], 'ATTN '+av.toFixed(0)+'   MLP '+mv.toFixed(0), false);
   }
   if(st.r) for(let l=0;l<NF;l++){                                 // the stream, in numbers
+    if(!near(l)) continue;
     const T=ticker[l], x=T.x, w=T.c.width, hgt=T.c.height;
     x.clearRect(0,0,w,hgt);
     x.fillStyle='rgba(6,10,16,.72)'; x.fillRect(0,0,w,hgt);
@@ -639,7 +650,9 @@ function bsConnect(base){
 // ---------- walking + playback ----------
 const AUTO = /[?&]auto/.test(location.search);   // slow crawl, for recording
 const free=new THREE.Vector3(0,1.72,1.5);
-let z=1.5, yaw=0, pitch=0, bob=0, moving=0, cur=0, playing=false, acc=0, pulse=-1;
+// spawn a couple of chambers in: layer 0 is the dullest room in the model
+let z=((parseFloat((location.search.match(/f=([\d.]+)/)||[])[1]) + 0.5) || 2.05)*SL,
+    yaw=0, pitch=0, bob=0, moving=0, cur=0, playing=false, acc=0, pulse=-1;
 const keys={};
 const CHEATS = {
   iddqd: ()=>{ god=!god;
@@ -664,9 +677,26 @@ addEventListener('keydown',e=>{keys[e.code]=true;
     for(const c in CHEATS) if(cheatBuf.endsWith(c)){ cheatMsg(CHEATS[c]()); cheatBuf=''; } }});
 addEventListener('keyup',e=>{keys[e.code]=false;});
 let inGame=false;
+const HINTS = [
+  'each window is one attention head — that is its own attention matrix',
+  'the blue numbers are the residual stream, the orange ones are MLP neurons',
+  'over every door: the word this layer would say next',
+];
+function hint(){
+  const el=document.getElementById('hintline'); let i=0;
+  const show=()=>{ if(i>=HINTS.length){ el.style.opacity=0; return; }
+    el.textContent=HINTS[i++]; el.style.opacity=1;
+    setTimeout(()=>{ el.style.opacity=0; setTimeout(show,900); }, 5200); };
+  show();
+}
 function showGame(on){ inGame=on; document.getElementById('start').hidden=on;
   for(const id of ['bar','gen','xh','fx','say']) document.getElementById(id).hidden=!on; }
 function enter(){ showGame(true);
+  if(!playing && cur < WAD.steps.length-1){    // never drop anyone into a still corridor
+    playing = true;
+    const g=document.getElementById('gen'); if(g) g.textContent='PAUSE';
+  }
+  hint();
   try{ const r = renderer.domElement.requestPointerLock();
        if(r && r.catch) r.catch(()=>{}); }catch(_){}   // fine without it
 }
@@ -722,7 +752,7 @@ function drawMap(here){
 }
 const floorEl=document.getElementById('floor'), wordEl=document.getElementById('word'),
       sinkEl=document.getElementById('sink'), sayEl=document.getElementById('say');
-let last=performance.now(), lastRun=0;
+let last=performance.now(), lastRun=0, lastChamber=-1;
 function tick(){ requestAnimationFrame(frame); }
 // the fallback must not fire before the level exists, or the camera is
 // positioned from an undefined layer count and z becomes NaN for good
@@ -763,6 +793,7 @@ function frame(now){
   const pz = pulse>=0 ? (NF*SL)*(pulse/(NF+1)) : -1e9;
 
   const f=Math.max(0,Math.min(NF-1,Math.floor(z/SL)));
+  if(f!==lastChamber){ lastChamber=f; showStep(cur); }
   floorEl.textContent=String(f).padStart(2,'0');
   tokEl.textContent=(cur+1)+'/'+WAD.steps.length;
   drawMap(f);

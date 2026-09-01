@@ -4,15 +4,28 @@
 
 ![walking through the layers while the model thinks](docs/walkthrough.gif)
 
-A tunnel of **29 chambers, one per layer** of Qwen3-0.6B. `W` forward, `S` back,
-that's the whole control scheme. Press **GENERATE** and the model starts
-thinking — every sign in the tunnel rewrites itself, token by token.
+**You are the residual stream.** The corridor is the thing that passes through
+every layer, and you walk down it. 29 chambers, one per layer of Qwen3-0.6B.
+It starts thinking the moment you walk in, and the whole tunnel rewrites itself
+around you, token by token. `W` forward, `S` back — that is the control scheme.
 
-- **sign over each door** — the logit lens: the word that layer would say now
-- **how dark a chamber is** — how much of its attention goes into the first token
-- **red beams pointing backwards** — heads staring into that first token
-- **the sigils** — one spoke per head, drawn from its own numbers. Nobody can
-  read them yet. That is the point.
+- **sixteen windows per chamber** — one per attention head, each showing that
+  head's own attention matrix. It is causal, so the lit part is a lower
+  triangle. A diagonal means the head reads the previous word; a bright left
+  column means it is parked on the first token; slanted stripes mean it is
+  copying. **The glass fills in as the model writes**, because the rows of the
+  matrix are positions in the text.
+- **blue numbers along the wall** — the twelve largest components of the
+  residual stream at that layer, with their indices. `#35` grows from 5.8 at
+  layer 3 to 102 at layer 27: *massive activations*
+  ([Sun et al. 2024](https://arxiv.org/abs/2402.17762)).
+- **orange numbers below them** — the eight loudest neurons of that layer's MLP.
+- **sign over each door** — the logit lens: the word that layer would say now,
+  and under it what each half of the block just added, `ATTN 217  MLP 380`.
+- **how dark a chamber is** — how much of its attention sits on the first token,
+  a control token that carries no content: the *attention sink*
+  ([Xiao et al. 2023](https://arxiv.org/abs/2309.17453)).
+- **the map in the status bar** — the whole model, and where you are in it.
 
 ## The two things the level is built around
 
@@ -32,9 +45,9 @@ model, live, through [brainscope](https://github.com/moudrkat/brainscope).
 
 <details><summary>What is measured, what I invented, and what the live mode costs</summary>
 
-The floor plan is invented — a corridor had to be some shape. The lights,
-signs, beams and sigils all come from one forward pass over a real generation
-(`tools/compile_wad.py`, on a GPU).
+The floor plan is invented — a corridor had to be some shape. The windows,
+the lights, the signs and every number come from one forward pass over a real
+generation (`tools/compile_wad.py`, on a GPU).
 
 The **logit lens is an approximation**: it pushes mid-stack states through a
 final norm and unembedding that were never meant for them. The babbling middle
