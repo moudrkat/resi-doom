@@ -18,12 +18,19 @@ in. `W` and `S` walk. That is the control scheme.
   the block just added: `ATTN 217  MLP 380`
 - **how dark a chamber is** — how much of its attention sits on the first token
 
-Two things fell out of the measurement rather than the design. **The answer
-does not fade in, it switches on**: layers 1–21 read as broken C++ and Chinese
-fragments, layer 22 reads `' Paris'` at p = 0.61. And **the corridor is dark in
-the middle because up to 76 % of the attention there sits on the first token**,
-a control token carrying no content — the *attention sink*
-([Xiao et al. 2023](https://arxiv.org/abs/2309.17453)).
+Two things fell out of the measurement rather than the design.
+
+**The answer does not fade in, it switches on.** On Qwen2.5-0.5B asked for the
+capital of France, layers 1–21 read as broken C++ and Chinese fragments and
+layer 22 reads `' Paris'` at p = 0.61.
+
+**And the two models handle the first token oppositely.** In the tunnel above
+(Qwen3-0.6B) the attention sitting on token 0 *climbs* with depth — 0.70 at
+layer 3, 0.76 at layer 27 — so the corridor darkens as you go and never
+recovers. On Qwen2.5-0.5B it runs at up to 0.84 through the middle and then
+**collapses to 0.01 at layer 22**, the same layer where the answer appears.
+That is the *attention sink* ([Xiao et al. 2023](https://arxiv.org/abs/2309.17453)),
+and token 0 is a control token carrying no content.
 
 Three ways in: the **recorded** run above · **your own sentence**, with
 SmolLM2-135M running in your tab · **your own model**, live, through
