@@ -96,7 +96,10 @@
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
 <script>
-const TAU = Math.PI*2, SL = 20, W = 5.2, H = 4.4;
+const TAU = Math.PI*2, W = 5.2, H = 4.4;
+// chamber length: 20 reads best walking, but it is a judgement call — ?len=14
+const SL = Math.max(8, Math.min(40,
+  parseFloat((location.search.match(/len=([\d.]+)/)||[])[1]) || 20));
 let WAD, NL, NH, NF, lamps = [], plates = [], rooms = [], ticker = [], neuron = [], adds = [], said = null, camera, scene, renderer;
 let god = false, kfa = false, clip = false;
 let LEVEL = null, mode = 'recorded', sinkOf = ()=>0, livePanes = [];
@@ -399,7 +402,7 @@ function buildLevel(){
     const lint=new THREE.Mesh(new THREE.BoxGeometry(W*2,1.3,1.1),fr);
     lint.position.set(0,H-0.65,zz); LEVEL.add(lint);
     if(f<NL){                      // the two points where the block adds to the stream
-      for(const [zz2,txt] of [[f*SL+SL/2,'+ ATTENTION'],[f*SL+SL-0.9,'+ MLP']]){
+      for(const [zz2,txt] of [[f*SL+SL*0.62,'+ ATTENTION'],[f*SL+SL-0.8,'+ MLP']]){
         const jp=makePlate(512,64); drawPlate(jp,txt,false);
         for(const side of [-1,1]){
           const jm=new THREE.Mesh(new THREE.PlaneGeometry(2.7,0.34),jp.mat);
@@ -464,7 +467,7 @@ function buildLevel(){
     const row=[];
     for(let h=0;h<NH;h++){
       const side=h%2?1:-1, k=Math.floor(h/2);
-      const z=l*SL+2.2+k*(SL/2-3.4)/(NH/2-1);   // attention: first half of the block
+      const z=l*SL+2.0+k*(SL*0.62-3.0)/(NH/2-1);  // attention takes most of the block
       const fm=new THREE.Mesh(frameGeo,new THREE.MeshBasicMaterial({color:0x3a2c1c}));
       const g =new THREE.Mesh(glassGeo,new THREE.MeshBasicMaterial({
         map: WAD.panes ? paneTex(WAD.panes[l][h]) : (WAD.live ? liveTex(l,h) : null),
@@ -504,8 +507,8 @@ function buildLevel(){
       t2.wrapS=THREE.RepeatWrapping; t2.repeat.set(2,1);
       const m2=new THREE.MeshBasicMaterial({map:t2, transparent:true});
       for(const side of [-1,1]){
-        const m=new THREE.Mesh(new THREE.PlaneGeometry(SL/2,0.62),m2);   // MLP: second half
-        m.position.set(side*(W-0.04),0.20,l*SL+SL*0.75);
+        const m=new THREE.Mesh(new THREE.PlaneGeometry(SL*0.38,0.62),m2);  // MLP: the tail
+        m.position.set(side*(W-0.04),0.20,l*SL+SL*0.81);
         m.rotation.y = side<0?Math.PI/2:-Math.PI/2; LEVEL.add(m);
       }
       neuron.push({c:c2, x:c2.getContext('2d'), t:t2});
