@@ -2,3 +2,7 @@ __pycache__/
 *.pyc
 .venv/
 notes/
+model/*.onnx
+model/*.data
+*.onnx
+*.onnx.data
