@@ -136,12 +136,19 @@ function drawPlate(p, txt, hot, alt){
   if(alt){                       // a near-tie: the layer has not decided yet
     const b='  '+alt.slice(0,12);
     x.textAlign='left';
-    const wa=x.measureText(a).width;
-    x.font=Math.round(h*0.36)+'px ui-monospace,Menlo,monospace';
-    const wb=x.measureText(b).width, x0=(w-wa-wb)/2;
-    x.font=(hot?'bold ':'')+Math.round(h*0.55)+'px ui-monospace,Menlo,monospace';
+    let f1=h*0.55, f2=h*0.36, wa, wb;
+    for(let i=0;i<14;i++){       // the pair must fit the sign, however long
+      x.font=(hot?'bold ':'')+Math.round(f1)+'px ui-monospace,Menlo,monospace';
+      wa=x.measureText(a).width;
+      x.font=Math.round(f2)+'px ui-monospace,Menlo,monospace';
+      wb=x.measureText(b).width;
+      if(wa+wb <= w-40) break;
+      f1*=0.9; f2*=0.9;
+    }
+    const x0=Math.max(20,(w-wa-wb)/2);
+    x.font=(hot?'bold ':'')+Math.round(f1)+'px ui-monospace,Menlo,monospace';
     x.fillStyle=hot?'#ffb03a':'#6f6152'; x.fillText(a, x0, h*0.52);
-    x.font=Math.round(h*0.36)+'px ui-monospace,Menlo,monospace';
+    x.font=Math.round(f2)+'px ui-monospace,Menlo,monospace';
     x.fillStyle='#4b4136'; x.fillText(b, x0+wa, h*0.56);
   } else {
     x.textAlign='center'; x.fillStyle=hot?'#ffb03a':'#6f6152';
