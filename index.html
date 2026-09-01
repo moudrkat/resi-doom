@@ -724,9 +724,13 @@ const floorEl=document.getElementById('floor'), wordEl=document.getElementById('
       sinkEl=document.getElementById('sink'), sayEl=document.getElementById('say');
 let last=performance.now(), lastRun=0;
 function tick(){ requestAnimationFrame(frame); }
-setInterval(()=>{ if(performance.now()-lastRun > 400) frame(performance.now()); }, 250);
+// the fallback must not fire before the level exists, or the camera is
+// positioned from an undefined layer count and z becomes NaN for good
+setInterval(()=>{ if(LEVEL && performance.now()-lastRun > 400) frame(performance.now()); }, 250);
 function frame(now){
+  if(!LEVEL) return;                  // nothing to walk in yet
   lastRun = now;
+  if(!Number.isFinite(z)) z = 1.5;    // never let a bad frame strand the camera
   const dt=Math.min(0.05,(now-last)/1000); last=now;
   const fwd=inGame ? ((keys.KeyW||keys.ArrowUp?1:0)-(keys.KeyS||keys.ArrowDown?1:0)||(AUTO?1:0)) : 0;
   const turn=(keys.ArrowLeft||keys.KeyA?1:0)-(keys.ArrowRight||keys.KeyD?1:0);
