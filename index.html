@@ -568,7 +568,7 @@ async function liveInit(prompt){
     ort.env.wasm.proxy = false;
     console.log('ort', ort.env.versions ? ort.env.versions.common : '?');
     if(!sess){
-      stat('downloading the model — 240 MB, once…');
+      stat('downloading SmolLM2-135M — 177 MB, once…');
       const data = await fetch('model/level.q4a.onnx.data').then(r=>r.arrayBuffer());
       let last;
       for(const ep of ['webgpu','wasm']){
@@ -590,7 +590,9 @@ async function liveInit(prompt){
            prompt, said:'', steps:[first.step]};
     lastNext = first.next;
     mode = 'live'; buildLevel(); showStep(0);
-    stat('READY — click anywhere to walk in. It keeps writing while you walk.');
+    stat('READY — click anywhere to walk in; it keeps writing while you walk. '+
+         'This model really runs here, but the graph only emits per-head numbers, '+
+         'not the matrices, so the windows stay empty.');
     liveLoop(48);
   }catch(e){ console.error('LIVE FAILED', e);
     stat('live mode failed: '+(e && (e.message || e.name || String(e)) || 'unknown')); }
