@@ -97,7 +97,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
 <script>
 const TAU = Math.PI*2, SL = 20, W = 5.2, H = 4.4;
-let WAD, NL, NH, NF, lamps = [], plates = [], rooms = [], ticker = [], neuron = [], adds = [], camera, scene, renderer;
+let WAD, NL, NH, NF, lamps = [], plates = [], rooms = [], ticker = [], neuron = [], adds = [], said = null, camera, scene, renderer;
 let god = false, kfa = false, clip = false;
 let LEVEL = null, mode = 'recorded', sinkOf = ()=>0, livePanes = [];
 
@@ -418,7 +418,10 @@ function buildLevel(){
   { const zEnd=NF*SL;
     const back=surf(wallTex,W*2,H,[5,1],1.0,[1,0.93,0.82]);
     back.position.set(0,H/2,zEnd); back.rotation.y=Math.PI; LEVEL.add(back);
-    const p=makePlate(1024,232); drawPlate(p, 'RMSNORM \u2192 UNEMBEDDING', true);
+    const p=makePlate(1024,232); drawPlate(p, 'RMSNORM \u2192 UNEMBEDDING', false);
+    const sp=makePlate(1024,232); drawPlate(sp, '', true);       // what came out
+    const sm=new THREE.Mesh(new THREE.PlaneGeometry(8.2,1.86),sp.mat);
+    sm.position.set(0,3.05,zEnd-0.07); sm.rotation.y=Math.PI; LEVEL.add(sm); said=sp;
     const pm=new THREE.Mesh(new THREE.PlaneGeometry(8.2,1.86),p.mat);
     pm.position.set(0,2.4,zEnd-0.06); pm.rotation.y=Math.PI; LEVEL.add(pm); }
 
@@ -535,6 +538,7 @@ function showStep(i){
       if(G.line){ G.line.position.y = G.top - 1.06*frac; G.line.visible = frac < 0.995; }
     }
   }
+  if(said) drawPlate(said, (st.t||'').replace(/\n/g,'⏎').trim() || '\u2423', true);
   if(st.a) for(let l=0;l<NL;l++){
     if(!near(l)) continue;
     const [av,mv] = st.a[l];
