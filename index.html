@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>QWEN E1M1</title>
+<style>
+  :root{color-scheme:dark}
+  html,body{margin:0;height:100%;background:#000;overflow:hidden;
+    font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;color:#c9bda6}
+  canvas{display:block;image-rendering:pixelated}
+  [hidden]{display:none!important}
+  #fx{position:fixed;inset:0;pointer-events:none;z-index:3;
+    background:radial-gradient(ellipse at 50% 45%,transparent 40%,rgba(0,0,0,.6) 97%),
+      repeating-linear-gradient(0deg,rgba(0,0,0,.17) 0 1px,transparent 1px 3px)}
+  #say{position:fixed;left:0;right:0;bottom:96px;z-index:4;pointer-events:none;
+    text-align:center;font-size:15px;line-height:1.6;color:#9ad4ff;
+    text-shadow:0 0 10px #000,0 0 22px #1a4a7a;padding:0 12vw;min-height:2.6em}
+  #say b{color:#fff;font-weight:400}
+  #bar{position:fixed;left:0;right:0;bottom:0;z-index:4;pointer-events:none;
+    display:grid;grid-template-columns:auto 1fr auto;align-items:stretch;gap:14px;
+    padding:10px 16px 12px;background:linear-gradient(#0000,#0a0806 55%);border-top:1px solid #241d14}
+  .cell{border:1px solid #2c2318;background:#100c08;padding:6px 14px}
+  .k{font-size:9px;letter-spacing:3px;color:#6b5a3f;display:block;margin-bottom:3px}
+  #floor{font-size:36px;font-weight:700;line-height:.85;color:#ffb03a;text-shadow:0 0 14px #ff9b1a66}
+  #word{font-size:23px;color:#ffe0a0;text-align:center;word-break:break-all;line-height:1.05;
+    text-shadow:0 0 12px #ff9b1a44}
+  #sink{font-size:24px;font-weight:700;line-height:.9;color:#d8492f;text-shadow:0 0 12px #d8492f55}
+  #gen{position:fixed;top:15px;right:17px;z-index:5;pointer-events:auto;background:#160f0a;
+    color:#ffb03a;border:1px solid #4a3418;padding:11px 18px;font:inherit;font-size:12px;
+    letter-spacing:3px;cursor:pointer}
+  #gen:hover{background:#241708;border-color:#ffb03a}
+  #start{position:fixed;inset:0;z-index:9;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;background:#08060a;cursor:pointer;text-align:center}
+  #start h1{font-size:15px;letter-spacing:10px;margin:0 0 14px;color:#ffb03a;font-weight:400}
+  #start p{margin:0 0 8px;font-size:12.5px;color:#7d6a4c;letter-spacing:.5px;max-width:52ch;line-height:1.8}
+  #start .dim{color:#3b3128;margin-top:20px;font-size:11px;letter-spacing:2px}
+  #xh{position:fixed;left:50%;top:50%;width:2px;height:2px;margin:-1px;z-index:4;background:#ffb03a;opacity:.45}
+</style>
+</head>
+<body>
+<div id="start">
+  <h1>Q W E N 3 - 0 . 6 B &nbsp;·&nbsp; E 1 M 1</h1>
+  <p id="blurb">načítám level…</p>
+  <p class="dim">KLIKNI PRO VSTUP · W DOPŘEDU · S ZPÁTKY · SHIFT BĚH · MYŠ ROZHLED · ESC VEN</p>
+</div>
+<div id="xh" hidden></div><div id="fx" hidden></div>
+<button id="gen" hidden>GENERUJ</button>
+<div id="say" hidden></div>
+<div id="bar" hidden>
+  <div class="cell"><span class="k">VRSTVA</span><div id="floor">00</div></div>
+  <div class="cell"><span class="k">CO SI MODEL MYSLÍ V TOMHLE PATŘE</span><div id="word">&nbsp;</div></div>
+  <div class="cell"><span class="k">POZORNOST DO NIČEHO</span><div id="sink">0%</div></div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
+<script>
+const TAU = Math.PI*2, SL = 20, W = 5.2, H = 4.4;
+let WAD, NL, NH, NF, lamps = [], plates = [], coreMat, camera, scene, renderer;
+
+fetch('wad.json').then(r=>r.json()).then(w => { WAD = w; build(); });
+
+// ---------- textures ----------
+function tex(kind){
+  const c=document.createElement('canvas'); c.width=c.height=256; const x=c.getContext('2d');
+  x.fillStyle = kind==='floor' ? '#3a3128' : '#463a2c'; x.fillRect(0,0,256,256);
+  for(let i=0;i<9000;i++){const v=Math.random()*44-22;
+    x.fillStyle=`rgba(${128+v},${118+v},${100+v},.16)`;x.fillRect(Math.random()*256,Math.random()*256,2,2);}
+  x.strokeStyle='rgba(0,0,0,.55)'; x.lineWidth=3;
+  if(kind==='floor'){for(let i=0;i<=256;i+=32){x.beginPath();x.moveTo(i,0);x.lineTo(i,256);
+    x.moveTo(0,i);x.lineTo(256,i);x.stroke();}}
+  else{for(let i=0;i<=256;i+=64){x.beginPath();x.moveTo(0,i);x.lineTo(256,i);x.stroke();}
+    x.beginPath();x.moveTo(128,0);x.lineTo(128,256);x.stroke(); x.fillStyle='rgba(20,16,12,.85)';
+    for(let gy=16;gy<256;gy+=64) for(const gx of [16,112,144,240]){x.beginPath();x.arc(gx,gy,4,0,TAU);x.fill();}}
+  for(let i=0;i<26;i++){x.fillStyle='rgba(18,12,8,'+(0.05+Math.random()*0.16)+')';
+    x.fillRect(Math.random()*256,Math.random()*160,3+Math.random()*10,60+Math.random()*96);}
+  const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; return t;
+}
+function makePlate(w,h){
+  const c=document.createElement('canvas'); c.width=w; c.height=h;
+  const t=new THREE.CanvasTexture(c);
+  return {c, x:c.getContext('2d'), t, mat:new THREE.MeshBasicMaterial({map:t,transparent:true})};
+}
+function drawPlate(p, txt, hot){
+  const x=p.x, w=p.c.width, h=p.c.height;
+  x.clearRect(0,0,w,h); x.fillStyle='#0d0a07'; x.fillRect(0,0,w,h);
+  x.strokeStyle=hot?'#7a4a12':'#2a2118'; x.lineWidth=w/128; x.strokeRect(3,3,w-6,h-6);
+  x.fillStyle=hot?'#ffb03a':'#6f6152';
+  x.font=(hot?'bold ':'')+Math.round(h*0.55)+'px ui-monospace,Menlo,monospace';
+  x.textAlign='center'; x.textBaseline='middle';
+  x.fillText((txt||'').slice(0,18), w/2, h*0.52);
+  p.t.needsUpdate = true;
+}
+
+
+// ---------- graffiti: sprayed on the wall where they happen to be true ----------
+function spray(text, hue){
+  const w=1024,h=180,c=document.createElement('canvas'); c.width=w;c.height=h;
+  const x=c.getContext('2d');
+  x.font='bold 104px Impact,"Arial Black",ui-monospace,sans-serif';
+  x.textAlign='center'; x.textBaseline='middle';
+  let fs=104; while(x.measureText(text).width>w-46 && fs>13){fs-=3;
+    x.font='bold '+fs+'px Impact,"Arial Black",ui-monospace,sans-serif';}
+  // spray = the same glyphs stamped many times with jitter, never a clean edge
+  for(let i=0;i<26;i++){
+    x.globalAlpha=0.040+Math.random()*0.042;
+    x.fillStyle='hsl('+hue+','+(55+Math.random()*30)+'%,'+(52+Math.random()*24)+'%)';
+    x.fillText(text, w/2+(Math.random()-.5)*5.5, h/2+(Math.random()-.5)*5.5);
+  }
+  // overspray speckle
+  const m=x.getImageData(0,0,w,h);
+  x.globalAlpha=1;
+  for(let i=0;i<1400;i++){
+    const px=Math.random()*w|0, py=Math.random()*h|0;
+    if(m.data[(py*w+px)*4+3]<12) continue;
+    const ox=px+(Math.random()-.5)*26, oy=py+(Math.random()-.5)*18;
+    x.fillStyle='hsla('+hue+',70%,60%,'+(0.05+Math.random()*0.14)+')';
+    x.fillRect(ox,oy,1.6,1.6);
+  }
+  // drips
+  for(let i=0;i<9;i++){
+    const px=20+Math.random()*(w-40), py=h/2+fs*0.3;
+    x.fillStyle='hsla('+hue+',70%,55%,'+(0.10+Math.random()*0.16)+')';
+    x.fillRect(px,py,1.7,10+Math.random()*38);
+  }
+  const t=new THREE.CanvasTexture(c);
+  return new THREE.MeshBasicMaterial({map:t,transparent:true,depthWrite:false});
+}
+
+function graffiti(sinkStat, sector){
+  const NLl = sinkStat.length;
+  const pct = l => Math.round(sinkStat[l]*100);
+  const worst = sinkStat.indexOf(Math.max(...sinkStat));
+  // where does the emitted token first show up in the lens, on average?
+  let surf=[], S=WAD.steps;
+  for(const st of S){ const i=st.f.findIndex(([w])=>w===st.t); if(i>=0) surf.push(i); }
+  surf.sort((a,b)=>a-b);
+  const median = surf.length? surf[surf.length>>1] : NLl-2;
+
+  const G = [
+    [0,  'YOU ARE INSIDE A 0.6B MODEL', 32],
+    [0,  'NIC SE TU ZATIM NEDEJE', 200],
+    [1,  'JUST EMBEDDINGS DOWN HERE', 190],
+    [2,  'LAST CLEAN ROOM', 45],
+    [3,  'SOFTMAX HAS NO OFF SWITCH', 0],
+    [3,  'MIND THE SINK', 0],
+    [4,  pct(4)+'% INTO A TOKEN THAT MEANS NOTHING', 0],
+    [6,  'I ONLY LOOK BACKWARDS', 15],
+    [8,  'IT ALL LOOKS LIKE C++ FROM HERE', 95],
+    [9,  'NOBODY HAS EVER READ LAYER '+9, 280],
+    [11, 'WE ARE ALL JUST DOT PRODUCTS', 190],
+    [13, 'THE CAKE IS A LIE', 320],
+    [14, 'ATTENTION IS ALL YOU NEED (WE TRIED)', 45],
+    [16, 'TADY UZ TO NEKDO VI', 130],
+    [17, 'RESIDUAL STREAM ↑', 200],
+    [19, 'THE LENS IS A LIE', 0],
+    [20, 'TUNED LENS WAS HERE', 130],
+    [worst, 'DO NOT LOOK BACK — '+pct(worst)+'%', 0],
+    [median, 'IT KNEW ALREADY', 45],
+    [NLl-4, 'ALMOST A WORD', 45],
+    [NLl-2, 'FROM HERE IT IS JUST ENGLISH', 45],
+    [NLl-1, 'KDO TO CTE, JE NERD', 130],
+  ];
+  const seen = {};
+  for (const [l, txt, hue] of G){
+    const f = Math.max(0, Math.min(NF-1, l));
+    const n = (seen[f] = (seen[f]||0) + 1);
+    const side = n%2 ? -1 : 1;
+    const br = Math.min(1, 0.34 + sector(Math.min(f,NLl-1))*0.9);
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(6.6,1.16), spray(txt, hue));
+    m.material.color.setRGB(br,br,br);
+    m.position.set(side*(W-0.07), 1.15 + (n%3)*0.85, f*SL + 4 + (n*5.5)%(SL-9));
+    m.rotation.y = side<0 ? Math.PI/2 : -Math.PI/2;
+    m.rotation.z = (Math.random()-0.5)*0.11;
+    scene.add(m);
+  }
+}
+
+// ---------- level ----------
+function build(){
+  NL = WAD.layers; NH = WAD.heads; NF = NL + 1;
+  const S = WAD.steps;
+  // static architecture: sector brightness = how much this layer stares into nothing, on average
+  const meanSink = l => S.reduce((a,st)=>a + st.l[l][1].reduce((x,y)=>x+y,0)/NH, 0)/S.length;
+  const sinkStat = Array.from({length:NL}, (_,l)=>meanSink(l));
+  const sector = l => 0.09 + 1.0*Math.pow(1 - sinkStat[Math.min(l,NL-1)], 1.7);
+
+  THREE.ColorManagement.enabled = false;
+  scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x0a0705, 0.026);
+  camera = new THREE.PerspectiveCamera(80, innerWidth/innerHeight, 0.1, 600);
+  renderer = new THREE.WebGLRenderer({antialias:false});
+  renderer.setPixelRatio(0.46); renderer.setSize(innerWidth,innerHeight);
+  renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+  document.body.appendChild(renderer.domElement);
+  addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;
+    camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight);});
+
+  const wallTex=tex('wall'), floorTex=tex('floor'), quad=new THREE.PlaneGeometry(1,1);
+  const surf=(t,w,h,rep,br,tint)=>{
+    const m=new THREE.Mesh(quad,new THREE.MeshBasicMaterial({map:t.clone()}));
+    m.material.map.repeat.set(rep[0],rep[1]); m.material.map.needsUpdate=true;
+    m.material.color.setRGB(br*tint[0],br*tint[1],br*tint[2]); m.scale.set(w,h,1); return m;};
+
+  for(let f=0; f<NF; f++){
+    const br=sector(Math.min(f,NL-1)), z=f*SL+SL/2, t=[0.86,0.86,0.95];
+    const fl=surf(floorTex,W*2,SL,[3,5],br*1.15,t); fl.rotation.x=-Math.PI/2; fl.position.set(0,0,z);
+    const ce=surf(floorTex,W*2,SL,[3,5],br*0.42,t); ce.rotation.x= Math.PI/2; ce.position.set(0,H,z);
+    const wl=surf(wallTex,SL,H,[5,1],br,t); wl.rotation.y= Math.PI/2; wl.position.set(-W,H/2,z);
+    const wr=surf(wallTex,SL,H,[5,1],br,t); wr.rotation.y=-Math.PI/2; wr.position.set( W,H/2,z);
+    scene.add(fl,ce,wl,wr);
+    const zz=f*SL, fr=new THREE.MeshBasicMaterial({map:wallTex.clone()});
+    fr.color.setRGB(br*0.55,br*0.5,br*0.44);
+    for(const sx of [-1,1]){const m=new THREE.Mesh(new THREE.BoxGeometry(1.5,H,1.1),fr);
+      m.position.set(sx*(W-0.75),H/2,zz); scene.add(m);}
+    const lint=new THREE.Mesh(new THREE.BoxGeometry(W*2,1.3,1.1),fr);
+    lint.position.set(0,H-0.65,zz); scene.add(lint);
+    const p=makePlate(512,128); drawPlate(p,'',false);
+    const pm=new THREE.Mesh(new THREE.PlaneGeometry(7.4,1.68),p.mat);
+    pm.position.set(0,H-0.66,zz-0.58); pm.rotation.y=Math.PI; scene.add(pm); plates.push(p);
+    const np=makePlate(256,64); drawPlate(np,String(f).padStart(2,'0'),false);
+    const nm=new THREE.Mesh(new THREE.PlaneGeometry(1.5,0.36),np.mat);
+    nm.position.set(-W+0.06,2.5,zz+1.2); nm.rotation.y=Math.PI/2; scene.add(nm);
+  }
+  // back wall
+  { const zEnd=NF*SL;
+    const back=surf(wallTex,W*2,H,[5,1],1.0,[1,0.93,0.82]);
+    back.position.set(0,H/2,zEnd); back.rotation.y=Math.PI; scene.add(back);
+    const p=makePlate(1024,232); drawPlate(p, 'KONEC SITE', true);
+    const pm=new THREE.Mesh(new THREE.PlaneGeometry(8.2,1.86),p.mat);
+    pm.position.set(0,2.4,zEnd-0.06); pm.rotation.y=Math.PI; scene.add(pm); }
+
+  // residual stream
+  coreMat = new THREE.MeshBasicMaterial({color:0x24344e});
+  const pipe=new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.3,NF*SL,10,1,true),coreMat);
+  pipe.rotation.x=Math.PI/2; pipe.position.set(0,H-0.3,NF*SL/2); scene.add(pipe);
+
+  // lamps = attention heads
+  const lg=new THREE.SphereGeometry(0.17,8,6);
+  const beamGeo=new THREE.CylinderGeometry(0.05,0.05,1,6,1,true);
+  const hc=document.createElement('canvas'); hc.width=hc.height=64;
+  {const g=hc.getContext('2d'),rg=g.createRadialGradient(32,32,0,32,32,32);
+   rg.addColorStop(0,'rgba(255,255,255,1)');rg.addColorStop(.22,'rgba(255,255,255,.45)');
+   rg.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=rg;g.fillRect(0,0,64,64);}
+  const haloTex=new THREE.CanvasTexture(hc);
+  for(let l=0;l<NL;l++){ const row=[];
+    for(let h=0;h<NH;h++){
+      const side=h%2?1:-1, k=Math.floor(h/2), z=l*SL+2.4+k*(SL-4.8)/(NH/2-1);
+      const m=new THREE.Mesh(lg,new THREE.MeshBasicMaterial({color:0x111111}));
+      m.position.set(side*(W-0.22),2.85,z); scene.add(m);
+      const hm=new THREE.Mesh(new THREE.PlaneGeometry(2,2),new THREE.MeshBasicMaterial({
+        map:haloTex,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0.4}));
+      hm.position.copy(m.position); scene.add(hm);
+      const bm=new THREE.Mesh(beamGeo,new THREE.MeshBasicMaterial({transparent:true,opacity:0,
+        blending:THREE.AdditiveBlending,depthWrite:false}));
+      bm.rotation.x=Math.PI/2; bm.position.set(side*(W-0.34),2.85,z); scene.add(bm);
+      row.push({m,hm,bm,z,side});
+    } lamps.push(row); }
+
+  graffiti(sinkStat, sector);
+
+  document.getElementById('blurb').innerHTML =
+    NF+' komor = '+NL+' vrstev sítě. Nad každými dveřmi je vidět, co si model v té vrstvě myslí.<br>'+
+    'Zmáčkni GENERUJ a on začne přemýšlet — a celý tunel se ti kolem hlavy přepíše.';
+  showStep(0); run();
+}
+
+// ---------- what the model is doing right now ----------
+function showStep(i){
+  const st = WAD.steps[i], want = st.t;
+  for(let f=0; f<NF; f++){
+    const [w,p] = st.f[f];
+    drawPlate(plates[f], (w||'').replace(/\n/g,'⏎').trim()||'␣', w===want && p>0.25);
+  }
+  for(let l=0;l<NL;l++){
+    const [ent,sink] = st.l[l];
+    for(let h=0;h<NH;h++){
+      const focus=1-ent[h], sk=sink[h];
+      const col=new THREE.Color().setHSL(0.085-0.075*sk, 0.42+0.55*sk, 0.13+0.46*focus);
+      const L=lamps[l][h];
+      L.m.material.color.copy(col);
+      L.hm.material.color.copy(col); L.hm.material.opacity=0.20+0.5*focus;
+      if(sk>0.3){ const len=3+5*sk;
+        L.bm.material.color.setHSL(0.015,0.85,0.10+0.26*sk);
+        L.bm.material.opacity=0.10+0.42*sk;
+        L.bm.scale.y=len; L.bm.position.z = L.z - len/2;
+      } else L.bm.material.opacity = 0;
+    }
+  }
+  cur = i;
+}
+
+// ---------- walking + playback ----------
+let z=1.5, yaw=0, pitch=0, bob=0, moving=0, cur=0, playing=false, acc=0, pulse=-1;
+const keys={};
+addEventListener('keydown',e=>{keys[e.code]=true;});
+addEventListener('keyup',e=>{keys[e.code]=false;});
+function run(){
+  const start=document.getElementById('start');
+  start.onclick=()=>renderer.domElement.requestPointerLock();
+  document.addEventListener('pointerlockchange',()=>{
+    const on=document.pointerLockElement===renderer.domElement;
+    start.hidden=on;
+    for(const id of ['bar','gen','xh','fx','say']) document.getElementById(id).hidden=!on;});
+  addEventListener('mousemove',e=>{
+    if(document.pointerLockElement!==renderer.domElement) return;
+    yaw=Math.max(-1.4,Math.min(1.4,yaw-e.movementX*0.0022));
+    pitch=Math.max(-0.9,Math.min(0.9,pitch-e.movementY*0.0022));});
+  const gen=document.getElementById('gen');
+  gen.onclick=()=>{ playing=!playing; if(playing&&cur>=WAD.steps.length-1){cur=0;}
+    gen.textContent = playing?'STOP':'GENERUJ'; };
+  requestAnimationFrame(frame);
+}
+const floorEl=document.getElementById('floor'), wordEl=document.getElementById('word'),
+      sinkEl=document.getElementById('sink'), sayEl=document.getElementById('say');
+let last=performance.now();
+function frame(now){
+  const dt=Math.min(0.05,(now-last)/1000); last=now;
+  const fwd=(keys.KeyW||keys.ArrowUp?1:0)-(keys.KeyS||keys.ArrowDown?1:0);
+  const sp=(keys.ShiftLeft||keys.ShiftRight?14:6.6);
+  z=Math.max(0.8,Math.min(NF*SL-1.2, z+fwd*sp*dt));
+  moving+=((fwd?1:0)-moving)*Math.min(1,dt*9); bob+=dt*sp*1.05*(fwd?1:0);
+  camera.position.set(Math.sin(bob*0.5)*0.07*moving, 1.72+Math.sin(bob)*0.055*moving, z);
+  camera.rotation.set(0,0,0); camera.rotateY(Math.PI+yaw); camera.rotateX(pitch);
+
+  if(playing){
+    acc+=dt;
+    if(acc>0.14){ acc=0;
+      if(cur<WAD.steps.length-1){ showStep(cur+1); pulse=0; }
+      else { playing=false; document.getElementById('gen').textContent='GENERUJ'; }
+      const said=WAD.steps.slice(0,cur+1).map(s=>s.t).join('')
+        .replace(/<think>/,'').replace(/<\/think>/,'');
+      sayEl.innerHTML = said.slice(-190).replace(/\n/g,' ')
+        .replace(/(\S+\s*)$/,'<b>$1</b>');
+    }
+  }
+  if(pulse>=0){ pulse+=dt*3.2; if(pulse>NF+1) pulse=-1; }
+  const pz = pulse>=0 ? (NF*SL)*(pulse/(NF+1)) : -1e9;
+  coreMat.color.setHSL(0.58,0.5,0.10+(pulse>=0?0.62*Math.exp(-Math.pow((pz-z)/16,2)):0));
+
+  const f=Math.max(0,Math.min(NF-1,Math.floor(z/SL)));
+  floorEl.textContent=String(f).padStart(2,'0');
+  const [w,p]=WAD.steps[cur].f[f];
+  wordEl.textContent=(w||'').replace(/\n/g,'⏎')||'␣';
+  const sk=WAD.steps[cur].l[Math.min(f,NL-1)][1];
+  sinkEl.textContent=(sk.reduce((a,b)=>a+b,0)/NH*100).toFixed(0)+'%';
+  for(const row of lamps) for(const L of row) L.hm.lookAt(camera.position);
+  renderer.render(scene,camera);
+  requestAnimationFrame(frame);
+}
+</script>
+</body>
+</html>
