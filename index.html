@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>QWEN E1M1</title>
+<title>RESI-DOOM</title>
 <style>
   :root{color-scheme:dark}
   html,body{margin:0;height:100%;background:#000;overflow:hidden;
@@ -18,10 +18,11 @@
     text-shadow:0 0 10px #000,0 0 22px #1a4a7a;padding:0 12vw;min-height:2.6em}
   #say b{color:#fff;font-weight:400}
   #bar{position:fixed;left:0;right:0;bottom:0;z-index:4;pointer-events:none;
-    display:grid;grid-template-columns:auto 1fr auto;align-items:stretch;gap:14px;
+    display:grid;grid-template-columns:auto auto 1fr auto;align-items:stretch;gap:14px;
     padding:10px 16px 12px;background:linear-gradient(#0000,#0a0806 55%);border-top:1px solid #241d14}
   .cell{border:1px solid #2c2318;background:#100c08;padding:6px 14px}
   .k{font-size:9px;letter-spacing:3px;color:#6b5a3f;display:block;margin-bottom:3px}
+  #tok{font-size:36px;font-weight:700;line-height:.85;color:#7f9fb8}
   #floor{font-size:36px;font-weight:700;line-height:.85;color:#ffb03a;text-shadow:0 0 14px #ff9b1a66}
   #word{font-size:23px;color:#ffe0a0;text-align:center;word-break:break-all;line-height:1.05;
     text-shadow:0 0 12px #ff9b1a44}
@@ -54,7 +55,8 @@
 </head>
 <body>
 <div id="start">
-  <h1>Q W E N 3 - 0 . 6 B &nbsp;·&nbsp; E 1 M 1</h1>
+  <h1>R E S I - D O O M</h1>
+  <p style="color:#6b5a3f;margin-top:-8px">Qwen3-0.6B &nbsp;·&nbsp; E1M1 &nbsp;·&nbsp; you are the residual stream</p>
   <p id="blurb">loading level…</p>
   <div id="modes">
     <button class="mb" data-m="recorded">RECORDED &nbsp;·&nbsp; Qwen3-0.6B thinking</button>
@@ -71,13 +73,14 @@
 <div id="say" hidden></div>
 <div id="bar" hidden>
   <div class="cell"><span class="k">LAYER</span><div id="floor">00</div></div>
+  <div class="cell"><span class="k">TOKEN</span><div id="tok">0</div></div>
   <div class="cell"><span class="k">WHAT THIS LAYER THINKS THE NEXT WORD IS</span><div id="word">&nbsp;</div></div>
   <div class="cell"><span class="k">ATTENTION INTO NOTHING</span><div id="sink">0%</div></div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
 <script>
 const TAU = Math.PI*2, SL = 20, W = 5.2, H = 4.4;
-let WAD, NL, NH, NF, lamps = [], plates = [], rooms = [], coreMat, camera, scene, renderer;
+let WAD, NL, NH, NF, lamps = [], plates = [], rooms = [], ticker = [], adds = [], camera, scene, renderer;
 let god = false, kfa = false, clip = false;
 let LEVEL = null, mode = 'recorded';
 
@@ -256,13 +259,7 @@ function graffiti(sinkStat, sector){
     [NLl-2,'t','FROM HERE IT IS JUST ENGLISH',45],
     [NLl-1,'t','THE ANSWER WAS UPSTAIRS ALL ALONG',45],
     [NLl-1,'t','STOP READING. START WALKING.',130],
-    [3,'g',null,190], [7,'g',null,280], [12,'g',null,320], [18,'g',null,190],
-    [NLl-3,'g',null,280],
-    [3,'t','UNTRANSLATED',190],
-    [7,'t','WE WROTE DOWN WHAT THE HEADS DID',280],
-    [12,'t','NOBODY CAN READ THIS YET',320],
-    [18,'t','ONE DAY INTERPRETABILITY WILL',190],
-    [NLl-3,'t','...AND THEN WE WILL KNOW WHAT IT SAID',280],
+    [18,'t','ONE DAY SOMEONE WILL READ THESE WINDOWS',190],
     [2,'t','THE MASK IS LOWER TRIANGULAR AND SO AM I',190],
     [4,'t','POSITION 0 DID NOTHING WRONG',0],
     [5,'t','SOMEBODY HAS TO HOLD THE ATTENTION',0],
@@ -294,7 +291,7 @@ function graffiti(sinkStat, sector){
       new THREE.PlaneGeometry(glyph?2.4:(art?2.6:6.6), glyph?2.4:(art?1.3:1.16)),
       glyph ? sprayGlyph(gl[0], gl[1], hue) : art ? sprayArt(val,hue) : sprayText(val,hue));
     m.material.color.setRGB(br,br,br);
-    m.position.set(side*(W-0.07), (glyph?2.0:art?1.6:1.15)+(n%3)*0.8, f*SL+3.5+(n*4.7)%(SL-8));
+    m.position.set(side*(W-0.07), 1.34+(n%2)*0.42, f*SL+3.5+(n*4.7)%(SL-8));
     m.rotation.y = side<0?Math.PI/2:-Math.PI/2;
     m.rotation.z = (Math.random()-0.5)*0.11;
     LEVEL.add(m);
@@ -322,7 +319,7 @@ function buildLevel(){
     LEVEL.traverse(o=>{ if(o.geometry) o.geometry.dispose();
       if(o.material){ if(o.material.map) o.material.map.dispose(); o.material.dispose(); } }); }
   LEVEL = new THREE.Group(); scene.add(LEVEL);
-  lamps = []; plates = []; rooms = []; cur = 0;
+  lamps = []; plates = []; rooms = []; ticker = []; adds = []; cur = 0;
   NL = WAD.layers; NH = WAD.heads; NF = NL + 1;
   const S = WAD.steps;
   // static architecture: sector brightness = how much this layer stares into nothing, on average
@@ -353,6 +350,11 @@ function buildLevel(){
     const p=makePlate(512,128); drawPlate(p,'',false);
     const pm=new THREE.Mesh(new THREE.PlaneGeometry(7.4,1.68),p.mat);
     pm.position.set(0,H-0.66,zz-0.58); pm.rotation.y=Math.PI; LEVEL.add(pm); plates.push(p);
+    if(f<NL){                    // a block has two halves and both write to the stream
+      const ap=makePlate(512,64); drawPlate(ap,'',false);
+      const am=new THREE.Mesh(new THREE.PlaneGeometry(4.6,0.58),ap.mat);
+      am.position.set(0,H-1.62,zz-0.58); am.rotation.y=Math.PI; LEVEL.add(am); adds.push(ap);
+    } else adds.push(null);
     const np=makePlate(256,64); drawPlate(np,String(f).padStart(2,'0'),false);
     const nm=new THREE.Mesh(new THREE.PlaneGeometry(1.5,0.36),np.mat);
     nm.position.set(-W+0.06,2.5,zz+1.2); nm.rotation.y=Math.PI/2; LEVEL.add(nm);
@@ -365,32 +367,61 @@ function buildLevel(){
     const pm=new THREE.Mesh(new THREE.PlaneGeometry(8.2,1.86),p.mat);
     pm.position.set(0,2.4,zEnd-0.06); pm.rotation.y=Math.PI; LEVEL.add(pm); }
 
-  // residual stream
-  coreMat = new THREE.MeshBasicMaterial({color:0x24344e});
-  const pipe=new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.3,NF*SL,10,1,true),coreMat);
-  pipe.rotation.x=Math.PI/2; pipe.position.set(0,H-0.3,NF*SL/2); LEVEL.add(pipe);
 
-  // lamps = attention heads
-  const lg=new THREE.SphereGeometry(0.17,8,6);
-  const beamGeo=new THREE.CylinderGeometry(0.05,0.05,1,6,1,true);
-  const hc=document.createElement('canvas'); hc.width=hc.height=64;
-  {const g=hc.getContext('2d'),rg=g.createRadialGradient(32,32,0,32,32,32);
-   rg.addColorStop(0,'rgba(255,255,255,1)');rg.addColorStop(.22,'rgba(255,255,255,.45)');
-   rg.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=rg;g.fillRect(0,0,64,64);}
-  const haloTex=new THREE.CanvasTexture(hc);
-  for(let l=0;l<NL;l++){ const row=[];
+  // ---- one window per attention head: its whole attention matrix, as glass ----
+  // The matrix is causal, so the lit part is a lower triangle. A diagonal means
+  // the head reads the previous word; a bright left column means it is parked on
+  // the first token; slanted stripes mean it is copying. Nothing is stylised.
+  const paneTex = (b64)=>{
+    const bin=atob(b64), G=WAD.pane, c=document.createElement('canvas');
+    c.width=c.height=G; const x=c.getContext('2d'), img=x.createImageData(G,G);
+    for(let i=0;i<G*G;i++){
+      const v=bin.charCodeAt(i)/255, g=Math.pow(v,0.55);
+      img.data[i*4  ]=Math.round(255*Math.min(1,g*1.15));
+      img.data[i*4+1]=Math.round(190*g);
+      img.data[i*4+2]=Math.round(90*g*g);
+      img.data[i*4+3]=255;
+    }
+    x.putImageData(img,0,0);
+    const t=new THREE.CanvasTexture(c);
+    t.magFilter=THREE.NearestFilter; t.minFilter=THREE.NearestFilter; return t;
+  };
+  const frameGeo=new THREE.PlaneGeometry(1.30,1.30), glassGeo=new THREE.PlaneGeometry(1.06,1.06);
+  for(let l=0;l<NL;l++){
+    const row=[];
     for(let h=0;h<NH;h++){
-      const side=h%2?1:-1, k=Math.floor(h/2), z=l*SL+2.4+k*(SL-4.8)/(NH/2-1);
-      const m=new THREE.Mesh(lg,new THREE.MeshBasicMaterial({color:0x111111}));
-      m.position.set(side*(W-0.22),2.85,z); LEVEL.add(m);
-      const hm=new THREE.Mesh(new THREE.PlaneGeometry(2,2),new THREE.MeshBasicMaterial({
-        map:haloTex,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0.4}));
-      hm.position.copy(m.position); LEVEL.add(hm);
-      const bm=new THREE.Mesh(beamGeo,new THREE.MeshBasicMaterial({transparent:true,opacity:0,
-        blending:THREE.AdditiveBlending,depthWrite:false}));
-      bm.rotation.x=Math.PI/2; bm.position.set(side*(W-0.34),2.85,z); LEVEL.add(bm);
-      row.push({m,hm,bm,z,side});
-    } lamps.push(row); }
+      const side=h%2?1:-1, k=Math.floor(h/2);
+      const z=l*SL+2.6+k*(SL-5.2)/(NH/2-1);
+      const fm=new THREE.Mesh(frameGeo,new THREE.MeshBasicMaterial({color:0x140f0a}));
+      const g =new THREE.Mesh(glassGeo,new THREE.MeshBasicMaterial({
+        map:paneTex(WAD.panes[l][h]), transparent:true, opacity:1}));
+      for(const m of [fm,g]){ m.position.set(side*(W-0.05),2.35,z);
+        m.rotation.y = side<0?Math.PI/2:-Math.PI/2; }
+      g.position.x = side*(W-0.09);
+      const lb=makePlate(256,48); drawPlate(lb,'L'+l+' H'+h,false);
+      const lm=new THREE.Mesh(new THREE.PlaneGeometry(0.86,0.16),lb.mat);
+      lm.position.set(side*(W-0.06),1.60,z); lm.rotation.y=g.rotation.y;
+      LEVEL.add(fm,g,lm); row.push({g, top:2.35+0.53});
+    }
+    lamps.push(row);
+  }
+
+  // ---- the residual stream, running along the wall ----
+  // The corridor IS the residual stream: you travel down it and every chamber
+  // adds to it. The strip shows the twelve largest components of h at this layer.
+  const TW=2048, TH=80;
+  for(let l=0;l<NF;l++){
+    const c=document.createElement('canvas'); c.width=TW; c.height=TH;
+    const t=new THREE.CanvasTexture(c);
+    t.wrapS=THREE.RepeatWrapping; t.repeat.set(4,1);
+    const mat=new THREE.MeshBasicMaterial({map:t, transparent:true});
+    for(const side of [-1,1]){
+      const m=new THREE.Mesh(new THREE.PlaneGeometry(SL,0.62),mat);
+      m.position.set(side*(W-0.04),0.72,l*SL+SL/2);
+      m.rotation.y = side<0?Math.PI/2:-Math.PI/2; LEVEL.add(m);
+    }
+    ticker.push({c, x:c.getContext('2d'), t});
+  }
 
   graffiti(sinkStat, sector);
 
@@ -408,20 +439,38 @@ function showStep(i){
     drawPlate(plates[f], ((w||'').replace(/\n/g,'⏎').trim()||'␣')+(kfa?'  '+p.toFixed(2):''),
               w===want && p>0.25);
   }
+  // The matrix rows are positions in the text, so at token i only the top of
+  // the window exists yet. The glass fills in as the model writes.
+  const frac = Math.min(1, (WAD.n_prompt + i + 1) / (WAD.n_prompt + WAD.steps.length));
   for(let l=0;l<NL;l++){
     const [ent,sink] = st.l[l];
     for(let h=0;h<NH;h++){
-      const focus=1-ent[h], sk=sink[h];
-      const col=new THREE.Color().setHSL(0.085-0.075*sk, 0.42+0.55*sk, 0.13+0.46*focus);
-      const L=lamps[l][h];
-      L.m.material.color.copy(col);
-      L.hm.material.color.copy(col); L.hm.material.opacity=0.20+0.5*focus;
-      if(sk>(kfa?0.02:0.3)){ const len=3+5*sk;
-        L.bm.material.color.setHSL(0.015,0.85,0.10+0.26*sk);
-        L.bm.material.opacity=0.10+0.42*sk;
-        L.bm.scale.y=len; L.bm.position.z = L.z - len/2;
-      } else L.bm.material.opacity = 0;
+      const G = lamps[l][h];
+      G.g.material.opacity = 0.34 + 0.66*(1-ent[h]);            // sharp head = bright glass
+      const t = G.g.material.map;
+      t.repeat.set(1, frac); t.offset.set(0, 1-frac);
+      G.g.scale.y = frac; G.g.position.y = G.top - 1.06*frac/2;
     }
+  }
+  for(let l=0;l<NL;l++){
+    const [av,mv] = st.a[l];
+    drawPlate(adds[l], 'ATTN '+av.toFixed(0)+'   MLP '+mv.toFixed(0), false);
+  }
+  for(let l=0;l<NF;l++){                                          // the stream, in numbers
+    const T=ticker[l], x=T.x, w=T.c.width, hgt=T.c.height;
+    x.clearRect(0,0,w,hgt);
+    x.fillStyle='rgba(6,10,16,.72)'; x.fillRect(0,0,w,hgt);
+    x.font='bold 40px ui-monospace,Menlo,monospace'; x.textBaseline='middle';
+    let px=8;
+    for(const [d,v] of st.r[l]){
+      const big=Math.abs(v)>50;
+      x.fillStyle = big ? '#ff9b2a' : '#5f87a6';
+      x.fillText('#'+d, px, hgt/2); px += x.measureText('#'+d).width + 7;
+      x.fillStyle = big ? '#ffe9b8' : '#a8d2ec';
+      const t=(v>0?'+':'')+v.toFixed(1);
+      x.fillText(t, px, hgt/2); px += x.measureText(t).width + 26;
+    }
+    T.t.needsUpdate = true;
   }
   cur = i;
 }
@@ -584,23 +633,30 @@ function run(){
     go.onclick=()=> m==='live' ? liveInit(inp.value) : bsConnect(inp.value);
     form.append(inp,go); inp.focus();
   });
+  // Losing the pointer lock must NOT throw you out — some browsers drop it on
+  // their own and you would bounce straight back to the menu. Only ESC leaves.
   document.addEventListener('pointerlockchange',()=>{
     if(document.pointerLockElement===renderer.domElement) showGame(true);
-    else if(inGame) showGame(false);          // ESC leaves; no lock = keyboard still works
   });
+  addEventListener('keydown', e=>{ if(e.code==='Escape' && inGame) showGame(false); });
   addEventListener('mousemove',e=>{
     if(document.pointerLockElement!==renderer.domElement) return;
     yaw=Math.max(-1.4,Math.min(1.4,yaw-e.movementX*0.0022));
     pitch=Math.max(-0.9,Math.min(0.9,pitch-e.movementY*0.0022));});
   const gen=document.getElementById('gen');
   gen.onclick=()=>{ playing=!playing; if(playing&&cur>=WAD.steps.length-1){cur=0;}
-    gen.textContent = playing?'STOP':'GENERATE'; };
-  requestAnimationFrame(frame);
+    gen.textContent = playing ? 'PAUSE' : (cur>0 ? 'RESUME' : 'GENERATE'); };
+  if(AUTO) enter();          // ?auto=1 walks itself, for recording
+  tick();
 }
+const tokEl=document.getElementById('tok');
 const floorEl=document.getElementById('floor'), wordEl=document.getElementById('word'),
       sinkEl=document.getElementById('sink'), sayEl=document.getElementById('say');
-let last=performance.now();
+let last=performance.now(), lastRun=0;
+function tick(){ requestAnimationFrame(frame); }
+setInterval(()=>{ if(performance.now()-lastRun > 400) frame(performance.now()); }, 250);
 function frame(now){
+  lastRun = now;
   const dt=Math.min(0.05,(now-last)/1000); last=now;
   const fwd=inGame ? ((keys.KeyW||keys.ArrowUp?1:0)-(keys.KeyS||keys.ArrowDown?1:0)||(AUTO?1:0)) : 0;
   const turn=(keys.ArrowLeft||keys.KeyA?1:0)-(keys.ArrowRight||keys.KeyD?1:0);
@@ -622,7 +678,7 @@ function frame(now){
     acc+=dt;
     if(acc>0.14){ acc=0;
       if(cur<WAD.steps.length-1){ showStep(cur+1); pulse=0; }
-      else { playing=false; document.getElementById('gen').textContent='GENERATE'; }
+      else { playing=false; document.getElementById('gen').textContent='REPLAY'; }
       const said=WAD.steps.slice(0,cur+1).map(s=>s.t).join('')
         .replace(/<think>/,'').replace(/<\/think>/,'');
       sayEl.innerHTML = said.slice(-190).replace(/\n/g,' ')
@@ -631,17 +687,17 @@ function frame(now){
   }
   if(pulse>=0){ pulse+=dt*3.2; if(pulse>NF+1) pulse=-1; }
   const pz = pulse>=0 ? (NF*SL)*(pulse/(NF+1)) : -1e9;
-  coreMat.color.setHSL(0.58,0.5,0.10+(pulse>=0?0.62*Math.exp(-Math.pow((pz-z)/16,2)):0));
 
   const f=Math.max(0,Math.min(NF-1,Math.floor(z/SL)));
   floorEl.textContent=String(f).padStart(2,'0');
+  tokEl.textContent=(cur+1)+'/'+WAD.steps.length;
   const [w,p]=WAD.steps[cur].f[f];
   wordEl.textContent=(w||'').replace(/\n/g,'⏎')||'␣';
   const sk=WAD.steps[cur].l[Math.min(f,NL-1)][1];
   sinkEl.textContent=(sk.reduce((a,b)=>a+b,0)/NH*100).toFixed(0)+'%';
-  for(const row of lamps) for(const L of row) L.hm.lookAt(camera.position);
+  for(const T of ticker) T.t.offset.x = (T.t.offset.x - dt*0.85) % 1;
   renderer.render(scene,camera);
-  requestAnimationFrame(frame);
+  tick();
 }
 </script>
 </body>

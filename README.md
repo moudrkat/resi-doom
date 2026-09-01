@@ -1,4 +1,4 @@
-# qwen-doom · E1M1
+# resi-doom · E1M1
 
 **You walk around inside a language model. It looks like Doom.**
 
@@ -27,7 +27,8 @@ thinking — every sign in the tunnel rewrites itself, token by token.
 SmolLM2-135M runs in your tab, 177 MB once · **CONNECT BRAINSCOPE** your own
 model, live, through [brainscope](https://github.com/moudrkat/brainscope).
 
-`IDDQD` `IDKFA` `IDCLIP` `IDDT` work. `?auto=1` walks by itself.
+`IDDQD` `IDKFA` `IDCLIP` `IDDT` work. GENERATE pauses and resumes.
+`?auto=1` walks by itself, for recording.
 
 <details><summary>What is measured, what I invented, and what the live mode costs</summary>
 
