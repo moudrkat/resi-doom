@@ -54,11 +54,15 @@ with torch.no_grad():
 steps = []
 for t in range(len(gen_ids)):
     q = n_prompt + t - 1                    # position that predicted token t
+    # top three, not one: mid-stack the runners-up are often a hair behind,
+    # and that near-tie is the whole character of the readout
     floors = []
     for l in range(L + 1):
         z = head(norm(o.hidden_states[l][0, q]))
-        p = z.softmax(-1); top = p.topk(1)
-        floors.append([tok.decode([top.indices[0].item()]), round(top.values[0].item(), 3)])
+        p = z.softmax(-1); top = p.topk(3)
+        floors.append([[tok.decode([i]), round(v, 3)]
+                       for i, v in zip(top.indices.tolist(),
+                                       [round(float(x), 3) for x in top.values])])
     # the twelve largest components of the residual stream at each layer,
     # with their indices — these run along the walls
     # what each half of the block actually contributed at this position
@@ -126,6 +130,10 @@ print("\n== what each half of the block adds (step 0: |attn| / |mlp|) ==")
 for l in range(0, L, 3):
     a_, m_ = steps[0]["a"][l]
     print(f"  layer {l:>2}: attn {a_:>8.1f}   mlp {m_:>8.1f}   mlp/attn {m_/max(a_,1e-9):>6.2f}")
+print("\n== how close are the runners-up? (step 0) ==")
+for l in range(0, L+1, 4):
+    f0 = steps[0]["f"][l]
+    print(f"  layer {l:>2}: " + "   ".join(f"{w!r}:{pv:.2f}" for w, pv in f0))
 print("\n== how far back the heads look, per floor (step 0: median / max tokens) ==")
 import statistics
 for l in range(0, L, 3):

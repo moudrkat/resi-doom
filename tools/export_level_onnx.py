@@ -1,77 +1,59 @@
-"""Export a small LM as an ONNX graph that emits LEVEL DATA, not hidden states.
-
-Outputs per forward pass (last position only):
-  logits   (1, V)     - for greedy/sampled decoding in JS
-  lens_id  (L+1,)     - logit-lens argmax per layer  -> the sign over each door
-  lens_p   (L+1,)     - its probability
-  sink     (L, H)     - attention mass on token 0    -> the red beams
-  ent      (L, H)     - normalised attention entropy -> lamp brightness
-"""
-import os, sys, math, torch, torch.nn as nn
+"""Export a small LM as a graph that emits level data — now including the
+attention row per head, so the browser can build the matrix up as it writes."""
+import os, sys, glob, torch, torch.nn as nn, numpy as np
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
-MID = sys.argv[1] if len(sys.argv) > 1 else "HuggingFaceTB/SmolLM2-135M-Instruct"
-OUT = sys.argv[2] if len(sys.argv) > 2 else "level.onnx"
-
+MID = sys.argv[1]; TAG = sys.argv[2]
 tok = AutoTokenizer.from_pretrained(MID)
-model = AutoModelForCausalLM.from_pretrained(
-    MID, dtype=torch.float32, attn_implementation="eager").eval()
+model = AutoModelForCausalLM.from_pretrained(MID, dtype=torch.float32,
+        attn_implementation="eager").eval()
 cfg = model.config
-L, H = cfg.num_hidden_layers, cfg.num_attention_heads
-print(f"{MID}: layers={L} heads={H} hidden={cfg.hidden_size} vocab={cfg.vocab_size}")
+print(f"{MID}: L={cfg.num_hidden_layers} H={cfg.num_attention_heads} "
+      f"hidden={cfg.hidden_size} vocab={cfg.vocab_size}")
 
 class Level(nn.Module):
-    def __init__(self, m):
-        super().__init__(); self.m = m
-        self.norm = m.model.norm; self.head = m.lm_head
-    def forward(self, input_ids):
-        o = self.m(input_ids=input_ids, output_attentions=True,
-                   output_hidden_states=True, use_cache=False)
-        logits = o.logits[:, -1, :]                          # (1, V)
-        hs = torch.stack([h[:, -1, :] for h in o.hidden_states], 0)[:, 0]   # (L+1, hidden)
-        z = self.head(self.norm(hs))                          # (L+1, V)
+    def __init__(s, m):
+        super().__init__(); s.m=m; s.norm=m.model.norm; s.head=m.lm_head
+        # the readout stays a Linear on purpose: MatMulNBits leaves a Gemm
+        # alone, and 4-bit on this matrix drops lens agreement 90% -> 58%.
+        # It is the matrix we are reading; it does not get compressed.
+    def forward(s, input_ids):
+        o = s.m(input_ids=input_ids, output_attentions=True,
+                output_hidden_states=True, use_cache=False)
+        hs = torch.stack([h[:, -1, :] for h in o.hidden_states], 0)[:, 0]
+        # HF applies the final norm before appending the last hidden state, so
+        # the last row is already normed - norming it again is what broke the
+        # readout on the top floor.
+        z = torch.cat([s.head(s.norm(hs[:-1])), s.head(hs[-1:])], 0)
+        logits = z[-1:]
         p = z.softmax(-1)
         lens_p, lens_id = p.max(-1)
-        a = torch.stack([x[0, :, -1, :] for x in o.attentions], 0)          # (L, H, T)
-        sink = a[:, :, 0]
-        # raw entropy in nats; JS divides by log(seq) so the graph stays
-        # length-agnostic instead of baking the export-time sequence in
-        ent = -(a * (a + 1e-9).log()).sum(-1)
-        return logits, lens_id.to(torch.int32), lens_p, sink, ent
+        a = torch.stack([x[0, :, -1, :] for x in o.attentions], 0)     # (L, H, T)
+        return (logits, lens_id.to(torch.int32), lens_p,
+                a[:, :, 0], -(a * (a + 1e-9).log()).sum(-1), a)
 
 wrap = Level(model).eval()
-ex = tok("Hello there, how are you", return_tensors="pt").input_ids
-with torch.no_grad():
-    outs = wrap(ex)
-for n, t in zip(["logits","lens_id","lens_p","sink","ent"], outs):
-    print(f"  {n:8s} {tuple(t.shape)} {t.dtype}")
-print("  lens words:", [tok.decode([i]) for i in outs[1].tolist()][:6], "...",
-      [tok.decode([i]) for i in outs[1].tolist()][-3:])
+ex = tok("The capital of France is", return_tensors="pt").input_ids
+with torch.no_grad(): ref = wrap(ex)
+for n, t in zip(["logits","lens_id","lens_p","sink","ent","attn"], ref):
+    print(f"  {n:8s} {tuple(t.shape)}")
 
-torch.onnx.export(
-    wrap, (ex,), OUT, opset_version=18, dynamo=True,
+raw = f"{TAG}.onnx"
+torch.onnx.export(wrap, (ex,), raw, opset_version=18, dynamo=True,
     input_names=["input_ids"],
-    output_names=["logits","lens_id","lens_p","sink","ent"],
-    dynamic_axes={"input_ids":{1:"seq"}, "sink":{2:"seq"}, "ent":{2:"seq"}},
-)
-print(f"\nwrote {OUT}: {os.path.getsize(OUT)/1e6:.1f} MB")
+    output_names=["logits","lens_id","lens_p","sink","ent","attn"],
+    dynamic_axes={"input_ids":{1:"seq"}})
 
-try:
-    from onnxruntime.quantization import quantize_dynamic, QuantType
-    q = OUT.replace(".onnx", ".q8.onnx")
-    quantize_dynamic(OUT, q, weight_type=QuantType.QInt8)
-    print(f"wrote {q}: {os.path.getsize(q)/1e6:.1f} MB")
-except Exception as e:
-    print("quantisation unavailable:", type(e).__name__, e)
+import onnx, onnxruntime as ort
+from onnxruntime.quantization.matmul_nbits_quantizer import (
+    MatMulNBitsQuantizer, DefaultWeightOnlyQuantConfig)
+q = MatMulNBitsQuantizer(onnx.load(raw),
+    algo_config=DefaultWeightOnlyQuantConfig(block_size=32, is_symmetric=False, bits=4))
+q.process(); q.model.save_model_to_file(f"{TAG}.q4.onnx", use_external_data_format=True)
 
-# ---------------------------------------------------------------------------
-# Shipping notes (measured 2026-09-01, SmolLM2-135M-Instruct):
-#   fp32                     545 MB   lens 100%   next=' Paris'   (reference)
-#   MatMulNBits 8bit blk32   240 MB   lens 100%   next=' Paris'   <- shipped
-#   MatMulNBits 4bit blk32   185 MB   lens  90%   next=' Paris'
-#   MatMulNBits 4bit blk64   177 MB   lens  68%   next=' the'     <- breaks it
-#   fp16                     conversion fails: keep_io_types mismatch on _to_copy
-# 4-bit changes the very numbers the level claims to measure, so it is not used.
-#
-#   uv pip install --python <venv>/bin/python --target ./pylibs onnxscript onnx onnxruntime
-#   PYTHONPATH=./pylibs python tools/export_level_onnx.py HuggingFaceTB/SmolLM2-135M-Instruct level.onnx
+def size(p): return (os.path.getsize(p)+sum(os.path.getsize(f) for f in glob.glob(p+"*data")))/1e6
+base = ort.InferenceSession(raw).run(None, {"input_ids": ex.numpy().astype(np.int64)})
+out  = ort.InferenceSession(f"{TAG}.q4.onnx").run(None, {"input_ids": ex.numpy().astype(np.int64)})
+print(f"\n  fp32 {size(raw):7.1f} MB   next={tok.decode([int(base[0][0].argmax())])!r}")
+print(f"  4bit {size(TAG+'.q4.onnx'):7.1f} MB   next={tok.decode([int(out[0][0].argmax())])!r}"
+      f"   lens {(out[1]==base[1]).mean()*100:.0f}%")

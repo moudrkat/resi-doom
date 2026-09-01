@@ -14,8 +14,9 @@ in. `W` and `S` walk. That is the control scheme.
 - **blue numbers on the wall** — the residual stream: the twelve largest
   components at that layer, with their indices
 - **orange numbers under them** — the loudest neurons of that layer's MLP
-- **over the door** — the word this layer would say now, and what each half of
-  the block just added: `ATTN 217  MLP 380`
+- **over the door** — the word this layer would say now, with the runner-up
+  beside it when the two are close, and what each half of the block just
+  added: `ATTN 217  MLP 380`
 - **how dark a chamber is** — how much of its attention sits on the first token
 
 Two things fell out of the measurement rather than the design.
@@ -33,7 +34,8 @@ That is the *attention sink* ([Xiao et al. 2023](https://arxiv.org/abs/2309.1745
 and token 0 is a control token carrying no content.
 
 Three ways in: the **recorded** run above · **your own sentence**, with
-SmolLM2-135M running in your tab · **your own model**, live, through
+SmolLM2-135M running in your tab and its windows filling in row by row as it
+writes · **your own model**, live, through
 [brainscope](https://github.com/moudrkat/brainscope).
 
 `IDDQD` `IDKFA` `IDCLIP` `IDDT` work.
@@ -50,9 +52,9 @@ middle may be the instrument rather than the model
 ([tuned lens](https://arxiv.org/abs/2303.08112)). One prompt, one model,
 greedy decoding.
 
-In-browser mode is 4-bit, which costs about three of thirty-one door signs
-against full precision — `onnxruntime-web` runs only the 4-bit kernel.
-brainscope mode has no matrices or neurons in its stream, so those stay blank.
+In-browser mode is 4-bit except the readout, which stays exact: that costs
+about three of thirty-one door signs against full precision. brainscope mode
+has no matrices or neurons in its stream, so those stay blank.
 
 ```bash
 python tools/compile_wad.py Qwen/Qwen3-0.6B 220 wad.json   # needs a GPU
