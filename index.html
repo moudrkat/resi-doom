@@ -36,8 +36,9 @@
   #start{position:fixed;inset:0;z-index:9;display:flex;flex-direction:column;
     align-items:center;justify-content:center;cursor:pointer;text-align:center;
     background:radial-gradient(ellipse at 50% 45%,rgba(8,6,10,.94),rgba(8,6,10,.80))}
-  #start h1{font-size:15px;letter-spacing:10px;margin:0 0 14px;color:#ffb03a;font-weight:400}
-  #start p{margin:0 0 8px;font-size:12.5px;color:#7d6a4c;letter-spacing:.5px;max-width:52ch;line-height:1.8}
+  #start h1{font-size:38px;letter-spacing:14px;margin:0 0 10px;color:#ffb03a;font-weight:700;
+    text-shadow:0 0 30px #ff9b1a55,0 4px 0 #000}
+  #start p{margin:0 0 8px;font-size:13px;color:#8d7a5c;letter-spacing:.5px;max-width:60ch;line-height:1.8}
   #start .dim{color:#3b3128;margin-top:20px;font-size:11px;letter-spacing:2px}
   #hintline{position:fixed;left:0;right:0;top:64px;z-index:6;text-align:center;font-size:13px;
     letter-spacing:1px;color:#cbb08a;text-shadow:0 0 12px #000,0 0 22px #000;opacity:0;
@@ -45,7 +46,14 @@
   #cheat{position:fixed;left:0;right:0;top:16px;z-index:6;text-align:center;font-size:13px;
     letter-spacing:2px;color:#9dff7a;text-shadow:0 0 12px #000;opacity:0;transition:opacity .5s;
     pointer-events:none}
-  #modes{display:flex;flex-direction:column;gap:7px;margin:18px 0 4px}
+  #modes{display:flex;flex-direction:column;align-items:center;gap:14px;margin:22px 0 4px}
+  .primary{font-size:19px!important;letter-spacing:9px!important;padding:16px 58px!important;
+    color:#ffb03a!important;border-color:#7a5420!important;background:#1d1206!important;
+    box-shadow:0 0 40px #ff9b1a22}
+  .primary:hover{background:#2e1b07!important;border-color:#ffb03a!important;
+    box-shadow:0 0 60px #ff9b1a44}
+  .alt{font-size:11px;color:#5c4d38;letter-spacing:1px}
+  .alt .mb{font-size:11px;padding:4px 9px;letter-spacing:1px;border-color:#2f2417}
   .mb{background:#140f0a;color:#c9a86a;border:1px solid #3a2c18;padding:9px 20px;
     font:inherit;font-size:11.5px;letter-spacing:2px;cursor:pointer}
   .mb:hover,.mb.on{background:#241708;border-color:#ffb03a;color:#ffb03a}
@@ -61,16 +69,18 @@
 <body>
 <div id="start">
   <h1>R E S I - D O O M</h1>
-  <p style="color:#6b5a3f;margin-top:-8px">walk inside a language model while it generates &nbsp;·&nbsp; Qwen3-0.6B</p>
+  <p style="color:#6b5a3f;margin-top:-8px">walk inside a language model while it generates</p>
   <p id="blurb">loading level…</p>
   <div id="modes">
-    <button class="mb" data-m="recorded">RECORDED &nbsp;·&nbsp; Qwen3-0.6B thinking</button>
-    <button class="mb" data-m="live">YOUR OWN SENTENCE &nbsp;·&nbsp; SmolLM2-135M, 177 MB, runs in this tab</button>
-    <button class="mb" data-m="bs">CONNECT BRAINSCOPE &nbsp;·&nbsp; your own model, live</button>
+    <button class="mb primary" data-m="recorded">E N T E R</button>
+    <div class="alt">or run it yourself:
+      <button class="mb" data-m="live">your own sentence</button>
+      <button class="mb" data-m="bs">connect brainscope</button>
+    </div>
   </div>
   <div id="mform"></div>
   <p id="mstat"></p>
-  <p class="dim">CLICK THE FLOOR TO ENTER · W FORWARD · S BACK · SHIFT RUN · A/D OR MOUSE TO LOOK · ESC OUT<br>AND YES, THE CHEATS WORK</p>
+  <p class="dim">W / S WALK &nbsp;·&nbsp; A / D OR MOUSE TO LOOK &nbsp;·&nbsp; ESC OUT &nbsp;·&nbsp; AND YES, THE CHEATS WORK</p>
 </div>
 <div id="xh" hidden></div><div id="fx" hidden></div>
 <button id="gen" hidden>GENERATE</button>
@@ -80,7 +90,7 @@
 <div id="bar" hidden>
   <div class="cell"><span class="k">LAYER</span><div id="floor">00</div></div>
   <div class="cell"><span class="k">TOKEN</span><div id="tok">0</div></div>
-  <div class="cell" style="padding:6px 10px"><span class="k">WHERE YOU ARE IN THE MODEL</span><canvas id="map" width="620" height="30" style="display:block;width:310px;height:15px"></canvas></div>
+  <div class="cell" style="padding:6px 10px"><span class="k">WHERE YOU ARE — WALKING DEEPER INTO THE MODEL</span><canvas id="map" width="760" height="34" style="display:block;width:380px;height:17px"></canvas></div>
   <div class="cell"><span class="k">WHAT THIS LAYER THINKS THE NEXT WORD IS</span><div id="word">&nbsp;</div></div>
   <div class="cell"><span class="k">ATTENTION ONTO TOKEN 0</span><div id="sink">0%</div></div>
 </div>
@@ -398,9 +408,9 @@ function buildLevel(){
     c.width=c.height=G; const x=c.getContext('2d'), img=x.createImageData(G,G);
     for(let i=0;i<G*G;i++){
       const v=bin.charCodeAt(i)/255, g=Math.pow(v,0.55);
-      img.data[i*4  ]=Math.round(255*Math.min(1,g*1.15));
-      img.data[i*4+1]=Math.round(190*g);
-      img.data[i*4+2]=Math.round(90*g*g);
+      img.data[i*4  ]=Math.round(28 + 227*Math.min(1,g*1.2));
+      img.data[i*4+1]=Math.round(20 + 186*g);
+      img.data[i*4+2]=Math.round(16 +  92*g*g);
       img.data[i*4+3]=255;
     }
     x.putImageData(img,0,0);
@@ -413,7 +423,7 @@ function buildLevel(){
     for(let h=0;h<NH;h++){
       const side=h%2?1:-1, k=Math.floor(h/2);
       const z=l*SL+2.6+k*(SL-5.2)/(NH/2-1);
-      const fm=new THREE.Mesh(frameGeo,new THREE.MeshBasicMaterial({color:0x140f0a}));
+      const fm=new THREE.Mesh(frameGeo,new THREE.MeshBasicMaterial({color:0x3a2c1c}));
       const g =new THREE.Mesh(glassGeo,new THREE.MeshBasicMaterial({
         map: WAD.panes ? paneTex(WAD.panes[l][h]) : null,
         color: WAD.panes ? 0xffffff : 0x241a12, transparent:true, opacity:1}));
@@ -423,7 +433,10 @@ function buildLevel(){
       const lb=makePlate(256,48); drawPlate(lb,'L'+l+' H'+h,false);
       const lm=new THREE.Mesh(new THREE.PlaneGeometry(0.86,0.16),lb.mat);
       lm.position.set(side*(W-0.06),1.60,z); lm.rotation.y=g.rotation.y;
-      LEVEL.add(fm,g,lm); row.push({g, top:2.35+0.53});
+      const ln=new THREE.Mesh(new THREE.PlaneGeometry(1.06,0.035),
+        new THREE.MeshBasicMaterial({color:0xfff0c0}));
+      ln.position.set(side*(W-0.10), 2.35+0.53, z); ln.rotation.y=g.rotation.y;
+      LEVEL.add(fm,g,lm,ln); row.push({g, line:ln, top:2.35+0.53});
     }
     lamps.push(row);
   }
@@ -460,8 +473,7 @@ function buildLevel(){
   graffiti(sinkStat, sector);
 
   document.getElementById('blurb').innerHTML =
-    NF+' chambers, one per layer. Over every door: the word that layer would say next.<br>'+
-    'Press GENERATE and it starts thinking — the whole tunnel rewrites itself around you.';
+    NF+' chambers, one per layer. It is already thinking; walk.';
   showStep(0); run();
 }
 
@@ -485,10 +497,8 @@ function showStep(i){
     const [ent,sink] = st.l[l] || [[],[]];
     for(let h=0;h<NH;h++){
       const G = lamps[l][h];
-      G.g.material.opacity = 0.34 + 0.66*(1-(ent[h]??0.5));            // sharp head = bright glass
-      const t = G.g.material.map;
-      if(t){ t.repeat.set(1, frac); t.offset.set(0, 1-frac); }
-      G.g.scale.y = frac; G.g.position.y = G.top - 1.06*frac/2;
+      G.g.material.opacity = 0.62 + 0.38*(1-(ent[h]??0.5));            // sharp head = bright glass
+      if(G.line){ G.line.position.y = G.top - 1.06*frac; G.line.visible = frac < 0.995; }
     }
   }
   if(st.a) for(let l=0;l<NL;l++){
@@ -739,16 +749,25 @@ function run(){
 const tokEl=document.getElementById('tok');
 const mapEl=document.getElementById('map'), mapX=mapEl.getContext('2d');
 function drawMap(here){
-  const w=mapEl.width, h=mapEl.height, n=NF, bw=w/n;
+  const w=mapEl.width, h=mapEl.height, n=NF;
+  const padL=76, padR=64, bw=(w-padL-padR)/n;
   mapX.clearRect(0,0,w,h);
+  mapX.font='bold 17px ui-monospace,monospace'; mapX.textBaseline='middle';
+  mapX.fillStyle='#6b5a3f'; mapX.textAlign='left';  mapX.fillText('IN', 2, h/2);
+  mapX.textAlign='right'; mapX.fillText('OUT', w-2, h/2);
+  mapX.fillStyle='#4a3c28'; mapX.textAlign='center';
+  mapX.fillText('\u25B8', padL-14, h/2);            // which way is deeper
+  mapX.fillText('\u25B8', w-padR+14, h/2);
   for(let i=0;i<n;i++){
-    const sink = sinkOf(Math.min(i,NL-1));
-    const v = 0.16 + 0.62*(1-sink);                 // same lighting as the corridor
-    mapX.fillStyle = i===here ? '#ffb03a' : `rgba(${Math.round(210*v)},${Math.round(180*v)},${Math.round(130*v)},.95)`;
-    mapX.fillRect(i*bw+1, i===here?0:5, bw-2, i===here?h:h-10);
+    const v = 0.18 + 0.62*(1-sinkOf(Math.min(i,NL-1)));
+    if(i===here){
+      mapX.fillStyle='#ffb03a';
+      mapX.fillRect(padL+i*bw-1, 0, bw+2, h);
+    } else {
+      mapX.fillStyle=`rgba(${Math.round(206*v)},${Math.round(176*v)},${Math.round(126*v)},.95)`;
+      mapX.fillRect(padL+i*bw+0.5, 6, bw-1, h-12);
+    }
   }
-  mapX.fillStyle='#6b5a3f'; mapX.font='11px ui-monospace,monospace';
-  mapX.fillText('in', 2, h-1); mapX.textAlign='right'; mapX.fillText('out', w-2, h-1); mapX.textAlign='left';
 }
 const floorEl=document.getElementById('floor'), wordEl=document.getElementById('word'),
       sinkEl=document.getElementById('sink'), sayEl=document.getElementById('say');
