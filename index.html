@@ -440,16 +440,22 @@ function buildLevel(){
     const nm=new THREE.Mesh(new THREE.PlaneGeometry(1.5,0.36),np.mat);
     nm.position.set(-W+0.06,2.5,zz+1.2); nm.rotation.y=Math.PI/2; LEVEL.add(nm);
   }
-  // back wall
+  // The end of the stream. Attention and the MLP add to it; these two do not -
+  // the norm rescales it and the unembedding multiplies it by the vocabulary,
+  // which is where it stops being a vector. So they are painted across it
+  // without a plus, and the wall above shows only the result.
   { const zEnd=NF*SL;
     const back=surf(wallTex,W*2,H,[5,1],1.0,[1,0.93,0.82]);
     back.position.set(0,H/2,zEnd); back.rotation.y=Math.PI; LEVEL.add(back);
-    const p=makePlate(1024,232); drawPlate(p, 'RMSNORM \u2192 UNEMBEDDING', false);
+    for(const [dz,txt] of [[3.4,'RMSNORM'],[1.4,'\u00D7 UNEMBEDDING  \u2192  151936 WORDS']]){
+      const fp=makePlate(768,64); drawPlate(fp,txt,false);
+      const fm=new THREE.Mesh(new THREE.PlaneGeometry(3.4,0.42),fp.mat);
+      fm.rotation.set(-Math.PI/2,0,Math.PI);
+      fm.position.set(0,0.05,zEnd-dz); LEVEL.add(fm);
+    }
     const sp=makePlate(1024,232); drawPlate(sp, '', true);       // what came out
     const sm=new THREE.Mesh(new THREE.PlaneGeometry(8.2,1.86),sp.mat);
-    sm.position.set(0,3.05,zEnd-0.07); sm.rotation.y=Math.PI; LEVEL.add(sm); said=sp;
-    const pm=new THREE.Mesh(new THREE.PlaneGeometry(8.2,1.86),p.mat);
-    pm.position.set(0,2.4,zEnd-0.06); pm.rotation.y=Math.PI; LEVEL.add(pm); }
+    sm.position.set(0,2.6,zEnd-0.07); sm.rotation.y=Math.PI; LEVEL.add(sm); said=sp; }
 
 
   // ---- one window per attention head: its whole attention matrix, as glass ----
