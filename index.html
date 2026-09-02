@@ -100,7 +100,7 @@ const TAU = Math.PI*2, W = 5.2, H = 4.4;
 // chamber length: 20 reads best walking, but it is a judgement call — ?len=14
 const SL = Math.max(8, Math.min(40,
   parseFloat((location.search.match(/len=([\d.]+)/)||[])[1]) || 20));
-let WAD, NL, NH, NF, lamps = [], plates = [], rooms = [], ticker = [], neuron = [], adds = [], said = null, words = null, camera, scene, renderer;
+let WAD, NL, NH, NF, lamps = [], plates = [], rooms = [], ticker = [], neuron = [], adds = [], said = null, words = null, fedIn = null, inWord = null, camera, scene, renderer;
 let god = false, kfa = false, clip = false;
 let LEVEL = null, mode = 'recorded', sinkOf = ()=>0, livePanes = [];
 
@@ -440,6 +440,27 @@ function buildLevel(){
     const nm=new THREE.Mesh(new THREE.PlaneGeometry(1.5,0.36),np.mat);
     nm.position.set(-W+0.06,2.5,zz+1.2); nm.rotation.y=Math.PI/2; LEVEL.add(nm);
   }
+  // The start, mirroring the end: a word arrives, the embedding turns it into
+  // the vector, and only then do the numbers begin. Qwen3 has no positional
+  // embedding table - position enters inside attention as RoPE - so there is
+  // nothing to draw between them.
+  { const front=surf(wallTex,W*2,H,[5,1],1.0,[1,0.93,0.82]);
+    front.position.set(0,H/2,0); LEVEL.add(front);
+    const ip=makePlate(1024,232); drawPlate(ip,'',true);
+    const im=new THREE.Mesh(new THREE.PlaneGeometry(8.2,1.86),ip.mat);
+    im.position.set(0,2.6,0.07); LEVEL.add(im); fedIn=ip;
+    { const c4=document.createElement('canvas'); c4.width=1024; c4.height=118;
+      const t4=new THREE.CanvasTexture(c4);
+      t4.center.set(0.5,0.5); t4.rotation=-Math.PI/2;
+      const m4=new THREE.MeshBasicMaterial({map:t4, transparent:true});
+      const w4=new THREE.Mesh(new THREE.PlaneGeometry(2.6,SL*0.40),m4);
+      w4.rotation.x=-Math.PI/2; w4.position.set(0,0.03,SL*0.20); LEVEL.add(w4);
+      inWord={c:c4, x:c4.getContext('2d'), t:t4}; }
+    const bp=makePlate(768,64); drawPlate(bp,'\u00D7 EMBEDDING  \u2192  ONE VECTOR',false);
+    const bm=new THREE.Mesh(new THREE.PlaneGeometry(3.4,0.42),bp.mat);
+    bm.rotation.set(-Math.PI/2,0,Math.PI);
+    bm.position.set(0,0.05,SL*0.42); LEVEL.add(bm); }
+
   // The end of the stream. Attention and the MLP add to it; these two do not -
   // the norm rescales it and the unembedding multiplies it by the vocabulary,
   // which is where it stops being a vector. So they are painted across it
@@ -447,7 +468,8 @@ function buildLevel(){
   { const zEnd=NF*SL;
     const back=surf(wallTex,W*2,H,[5,1],1.0,[1,0.93,0.82]);
     back.position.set(0,H/2,zEnd); back.rotation.y=Math.PI; LEVEL.add(back);
-    for(const [dz,txt] of [[6.2,'RMSNORM'],[3.6,'\u00D7 UNEMBEDDING  \u2192  151936 WORDS']]){
+    for(const [dz,txt] of [[SL*0.75,'RMSNORM  \u2192  RESCALED'],
+                           [SL*0.36,'\u00D7 UNEMBEDDING  \u2192  151936 WORDS']]){
       const fp=makePlate(768,64); drawPlate(fp,txt,false);
       const fm=new THREE.Mesh(new THREE.PlaneGeometry(3.4,0.42),fp.mat);
       fm.rotation.set(-Math.PI/2,0,Math.PI);
@@ -457,8 +479,8 @@ function buildLevel(){
       const t3=new THREE.CanvasTexture(c3);
       t3.center.set(0.5,0.5); t3.rotation=-Math.PI/2;
       const m3=new THREE.MeshBasicMaterial({map:t3, transparent:true});
-      const w3=new THREE.Mesh(new THREE.PlaneGeometry(2.6,3.3),m3);
-      w3.rotation.x=-Math.PI/2; w3.position.set(0,0.03,zEnd-1.75); LEVEL.add(w3);
+      const w3=new THREE.Mesh(new THREE.PlaneGeometry(2.6,SL*0.36),m3);
+      w3.rotation.x=-Math.PI/2; w3.position.set(0,0.03,zEnd-SL*0.18); LEVEL.add(w3);
       words={c:c3, x:c3.getContext('2d'), t:t3}; }
     const sp=makePlate(1024,232); drawPlate(sp, '', true);       // what came out
     const sm=new THREE.Mesh(new THREE.PlaneGeometry(8.2,1.86),sp.mat);
@@ -527,10 +549,11 @@ function buildLevel(){
     t.center.set(0.5,0.5); t.rotation = -Math.PI/2;  // reads the way you walk
     { // in the last chamber the numbers stop at the norm: past it the vector is
       // rescaled, and past the unembedding it is not that vector at all
-      const cut = (l===NF-1) ? 6.2 : 0;
-      const m=new THREE.Mesh(new THREE.PlaneGeometry(2.6,SL-cut),mat);
+      const cut  = (l===NF-1) ? SL*0.75 : 0;   // room for the three last steps
+      const head = (l===0)     ? SL*0.42 : 0;   // and for the embedding at the start
+      const m=new THREE.Mesh(new THREE.PlaneGeometry(2.6,SL-cut-head),mat);
       m.rotation.x=-Math.PI/2;
-      m.position.set(0,0.02,l*SL+(SL-cut)/2); LEVEL.add(m); }
+      m.position.set(0,0.02,l*SL+head+(SL-cut-head)/2); LEVEL.add(m); }
     ticker.push({c, x:c.getContext('2d'), t});
     if(l<NL && WAD.steps[0].n){     // the MLP is not a black box either
       const c2=document.createElement('canvas'); c2.width=TW; c2.height=TH;
@@ -579,6 +602,17 @@ function showStep(i){
       if(G.line){ G.line.position.y = G.top - 1.06*frac; G.line.visible = frac < 0.995; }
     }
   }
+  if(inWord){
+    const y=inWord.x, w=inWord.c.width, h=inWord.c.height;
+    const tk = ((i>0 ? WAD.steps[i-1].t : '\u2190 the prompt')||'').replace(/\n/g,'⏎').trim() || '\u2423';
+    y.clearRect(0,0,w,h); y.fillStyle='rgba(20,12,6,.80)'; y.fillRect(0,0,w,h);
+    y.font='bold 56px ui-monospace,Menlo,monospace'; y.textBaseline='middle';
+    y.textAlign='center'; y.fillStyle='#ffcf7a';
+    y.fillText('\u201C'+tk+'\u201D  \u2192', w/2, h/2);
+    y.textAlign='left'; inWord.t.needsUpdate = true;
+  }
+  if(fedIn) drawPlate(fedIn,
+    ((i>0 ? WAD.steps[i-1].t : '\u2190 the prompt')||'').replace(/\n/g,'⏎').trim() || '\u2423', true);
   if(words){
     const y=words.x, w=words.c.width, h=words.c.height;
     y.clearRect(0,0,w,h); y.fillStyle='rgba(20,12,6,.80)'; y.fillRect(0,0,w,h);
@@ -773,7 +807,7 @@ const AUTO = /[?&]auto/.test(location.search);   // slow crawl, for recording
 const AUTOSPD = parseFloat((location.search.match(/auto=([\d.]+)/)||[])[1]) || 3.4;
 const free=new THREE.Vector3(0,1.72,1.5);
 // spawn a couple of chambers in: layer 0 is the dullest room in the model
-let z=((parseFloat((location.search.match(/f=([\d.]+)/)||[])[1]) + 0.5) || 2.05)*SL,
+let z=((parseFloat((location.search.match(/f=(-?[\d.]+)/)||[])[1]) + 0.5) || 2.05)*SL,
     yaw=0, pitch=0, bob=0, moving=0, cur=0, playing=false, acc=0, pulse=-1;
 const keys={};
 const CHEATS = {
