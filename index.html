@@ -313,6 +313,16 @@ function graffiti(sinkStat, sector){
     [NLl-2,'t','FROM HERE IT IS JUST ENGLISH',45],
     [NLl-1,'t','THE ANSWER WAS UPSTAIRS ALL ALONG',45],
     [NLl-1,'t','STOP READING. START WALKING.',130],
+    [0,'a','mask',45], [2,'a','hazard',0], [5,'a','eye',280], [7,'a','back',15],
+    [10,'a','up',200], [12,'a','drain',0], [16,'a','skull',0], [19,'a','cake',320],
+    [22,'a','mask',190], [24,'a','back',15], [26,'a','eye',95],
+    [9,'t','SOME OF US ONLY COPY',95],
+    [11,'t','MIND THE GAP BETWEEN FIRST AND SECOND',45],
+    [14,'t','THE ANSWER IS NOT HERE YET',280],
+    [17,'t','SOMETHING HAPPENS AROUND HERE',45],
+    [20,'t','READ THE WINDOWS, NOT ME',130],
+    [23,'t','ALMOST ENGLISH',45],
+    [25,'t','ONE MORE LAYER',280],
     [18,'t','ONE DAY SOMEONE WILL READ THESE WINDOWS',190],
     [2,'t','THE MASK IS LOWER TRIANGULAR AND SO AM I',190],
     [4,'t','POSITION 0 DID NOTHING WRONG',0],
@@ -335,19 +345,23 @@ function graffiti(sinkStat, sector){
     [NLl-6,'t','ASK NEEL',280],
     [NLl-2,'t','EXIT THROUGH THE SOFTMAX',45],
   ];
-  const seen={};
-  for(const [lf,kind,val,hue] of G){
-    const f=L(lf), n=(seen[f]=(seen[f]||0)+1), side=n%2?-1:1;
-    const br=1;
-    const art=kind==='a';
-    const m=new THREE.Mesh(
-      new THREE.PlaneGeometry(art?1.9:6.4, art?0.95:0.95),
-      art ? sprayArt(val) : sprayText(val));
-    m.material.color.setRGB(br,br,br);
-    m.position.set(side*(W-0.07), 3.62, f*SL+3.5+(n*4.7)%(SL-8));
-    m.rotation.y = side<0?Math.PI/2:-Math.PI/2;
-    m.rotation.z = (Math.random()-0.5)*0.11;
-    LEVEL.add(m);
+  // group by chamber first, then space them out along it, alternating walls —
+  // dropping each one wherever a modulo landed put them on top of each other
+  const byRoom = {};
+  for(const g of G){ const f=L(g[0]); (byRoom[f] = byRoom[f] || []).push(g); }
+  for(const key in byRoom){
+    const f = +key, items = byRoom[key].slice(0, 5);
+    items.forEach((g, i) => {
+      const art = g[1]==='a';
+      const side = i%2 ? 1 : -1;
+      const m = new THREE.Mesh(
+        new THREE.PlaneGeometry(art?1.9:6.4, art?0.95:0.95),
+        art ? sprayArt(g[2]) : sprayText(g[2]));
+      m.position.set(side*(W-0.07), 3.62, f*SL + (i + 0.5) * SL / items.length);
+      m.rotation.y = side<0?Math.PI/2:-Math.PI/2;
+      m.rotation.z = (Math.random()-0.5)*0.10;
+      LEVEL.add(m);
+    });
   }
 }
 
@@ -359,8 +373,12 @@ function initGL(){
   scene = new THREE.Scene();
   scene.fog = new THREE.FogExp2(0x0a0705, 0.026);
   camera = new THREE.PerspectiveCamera(80, innerWidth/innerHeight, 0.1, 600);
-  renderer = new THREE.WebGLRenderer({antialias:false});
-  renderer.setPixelRatio(0.46); renderer.setSize(innerWidth,innerHeight);
+  // preserveDrawingBuffer so the canvas can be captured to video; ?hq drops the
+  // chunky Doom pixels for a crisp recording
+  const HQ = /[?&]hq/.test(location.search);
+  renderer = new THREE.WebGLRenderer({antialias:HQ, preserveDrawingBuffer:true});
+  renderer.setPixelRatio(HQ ? Math.min(devicePixelRatio,2) : 0.46);
+  renderer.setSize(innerWidth,innerHeight);
   renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
   document.body.appendChild(renderer.domElement);
   addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;
@@ -404,11 +422,9 @@ function buildLevel(){
     if(f<NL){                      // the two points where the block adds to the stream
       for(const [zz2,txt] of [[f*SL+SL*0.62,'+ ATTENTION'],[f*SL+SL-0.8,'+ MLP']]){
         const jp=makePlate(512,64); drawPlate(jp,txt,false);
-        for(const side of [-1,1]){
-          const jm=new THREE.Mesh(new THREE.PlaneGeometry(2.7,0.34),jp.mat);
-          jm.position.set(side*(W-0.05),0.95,zz2);
-          jm.rotation.y = side<0?Math.PI/2:-Math.PI/2; LEVEL.add(jm);
-        }
+        const jm=new THREE.Mesh(new THREE.PlaneGeometry(3.4,0.42),jp.mat);
+        jm.rotation.set(-Math.PI/2,0,Math.PI);   // painted across the stream
+        jm.position.set(0,0.04,zz2); LEVEL.add(jm);
       }
     }
     const p=makePlate(512,128); drawPlate(p,'',false);
@@ -486,20 +502,19 @@ function buildLevel(){
     lamps.push(row);
   }
 
-  // ---- the residual stream, running along the wall ----
-  // The corridor IS the residual stream: you travel down it and every chamber
-  // adds to it. The strip shows the twelve largest components of h at this layer.
-  const TW=2048, TH=80;
+  // ---- the residual stream, down the middle of the floor ----
+  // It is the only thing that runs through every chamber; attention and the MLP
+  // each belong to one layer. So it is the ground you walk on, not wall dressing.
+  const TW=1024, TH=150;
   for(let l=0;l<NF;l++){
     const c=document.createElement('canvas'); c.width=TW; c.height=TH;
     const t=new THREE.CanvasTexture(c);
-    t.wrapS=THREE.RepeatWrapping; t.repeat.set(4,1);
+    t.wrapS=THREE.RepeatWrapping; t.repeat.set(3,1);
     const mat=new THREE.MeshBasicMaterial({map:t, transparent:true});
-    for(const side of [-1,1]){
-      const m=new THREE.Mesh(new THREE.PlaneGeometry(SL,0.62),mat);
-      m.position.set(side*(W-0.04),0.66,l*SL+SL/2);
-      m.rotation.y = side<0?Math.PI/2:-Math.PI/2; LEVEL.add(m);
-    }
+    t.center.set(0.5,0.5); t.rotation = -Math.PI/2;  // reads the way you walk
+    { const m=new THREE.Mesh(new THREE.PlaneGeometry(2.6,SL),mat);
+      m.rotation.x=-Math.PI/2;
+      m.position.set(0,0.02,l*SL+SL/2); LEVEL.add(m); }
     ticker.push({c, x:c.getContext('2d'), t});
     if(l<NL && WAD.steps[0].n){     // the MLP is not a black box either
       const c2=document.createElement('canvas'); c2.width=TW; c2.height=TH;
@@ -507,8 +522,8 @@ function buildLevel(){
       t2.wrapS=THREE.RepeatWrapping; t2.repeat.set(2,1);
       const m2=new THREE.MeshBasicMaterial({map:t2, transparent:true});
       for(const side of [-1,1]){
-        const m=new THREE.Mesh(new THREE.PlaneGeometry(SL*0.38,0.62),m2);  // MLP: the tail
-        m.position.set(side*(W-0.04),0.20,l*SL+SL*0.81);
+        const m=new THREE.Mesh(new THREE.PlaneGeometry(SL*0.38,0.72),m2);  // MLP: the tail
+        m.position.set(side*(W-0.04),0.78,l*SL+SL*0.81);
         m.rotation.y = side<0?Math.PI/2:-Math.PI/2; LEVEL.add(m);
       }
       neuron.push({c:c2, x:c2.getContext('2d'), t:t2});
@@ -559,7 +574,7 @@ function showStep(i){
     const T=ticker[l], x=T.x, w=T.c.width, hgt=T.c.height;
     x.clearRect(0,0,w,hgt);
     x.fillStyle='rgba(6,10,16,.72)'; x.fillRect(0,0,w,hgt);
-    x.font='bold 40px ui-monospace,Menlo,monospace'; x.textBaseline='middle';
+    x.font='bold 52px ui-monospace,Menlo,monospace'; x.textBaseline='middle';
     let px=8;
     x.fillStyle='#3f6b8a'; const lab='RESIDUAL STREAM h \u2014 biggest #dimension, value';
     x.fillText(lab, px, hgt/2); px += x.measureText(lab).width + 34;
@@ -576,7 +591,7 @@ function showStep(i){
       const N=neuron[l], y=N.x, ww=N.c.width, hh=N.c.height;
       y.clearRect(0,0,ww,hh);
       y.fillStyle='rgba(14,8,6,.72)'; y.fillRect(0,0,ww,hh);
-      y.font='bold 40px ui-monospace,Menlo,monospace'; y.textBaseline='middle';
+      y.font='bold 44px ui-monospace,Menlo,monospace'; y.textBaseline='middle';
       let qx=8;
       y.fillStyle='#7a4a30'; const lab2='MLP NEURONS \u2014 loudest #neuron, value';
       y.fillText(lab2, qx, hh/2); qx += y.measureText(lab2).width + 34;
@@ -726,6 +741,7 @@ function bsConnect(base){
 
 // ---------- walking + playback ----------
 const AUTO = /[?&]auto/.test(location.search);   // slow crawl, for recording
+const AUTOSPD = parseFloat((location.search.match(/auto=([\d.]+)/)||[])[1]) || 3.4;
 const free=new THREE.Vector3(0,1.72,1.5);
 // spawn a couple of chambers in: layer 0 is the dullest room in the model
 let z=((parseFloat((location.search.match(/f=([\d.]+)/)||[])[1]) + 0.5) || 2.05)*SL,
@@ -856,7 +872,7 @@ function frame(now){
   const fwd=inGame ? ((keys.KeyW||keys.ArrowUp?1:0)-(keys.KeyS||keys.ArrowDown?1:0)||(AUTO?1:0)) : 0;
   const turn=(keys.ArrowLeft||keys.KeyA?1:0)-(keys.ArrowRight||keys.KeyD?1:0);
   if(turn) yaw=Math.max(-1.4,Math.min(1.4, yaw+turn*1.6*dt));
-  const sp=(keys.ShiftLeft||keys.ShiftRight?14:(AUTO?3.4:6.6));
+  const sp=(keys.ShiftLeft||keys.ShiftRight?14:(AUTO?AUTOSPD:6.6));
   moving+=((fwd?1:0)-moving)*Math.min(1,dt*9); bob+=dt*sp*1.05*(fwd?1:0);
   if(clip){
     const d=new THREE.Vector3(); camera.getWorldDirection(d);

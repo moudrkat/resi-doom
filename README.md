@@ -6,6 +6,8 @@
 
 ![walking through the layers while the model thinks](docs/walkthrough.gif)
 
+*(smoother: [docs/walkthrough.mp4](docs/walkthrough.mp4))*
+
 29 chambers, one per layer of Qwen3-0.6B. It is already thinking when you walk
 in. `W` and `S` walk. That is the control scheme.
 
