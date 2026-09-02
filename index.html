@@ -532,7 +532,10 @@ function buildLevel(){
       const ln=new THREE.Mesh(new THREE.PlaneGeometry(1.06,0.035),
         new THREE.MeshBasicMaterial({color:0xfff0c0}));
       ln.position.set(side*(W-0.10), 2.35+0.53, z); ln.rotation.y=g.rotation.y;
-      LEVEL.add(fm,g,lm,ln); row.push({g, line:ln, top:2.35+0.53});
+      const sh=new THREE.Mesh(new THREE.PlaneGeometry(1.06,1.06),
+        new THREE.MeshBasicMaterial({color:0x0b0805, transparent:true, opacity:0.58}));
+      sh.position.set(side*(W-0.11), 2.35, z); sh.rotation.y=g.rotation.y;
+      LEVEL.add(fm,g,lm,sh,ln); row.push({g, line:ln, shade:sh, top:2.35+0.53});
     }
     lamps.push(row);
   }
@@ -600,6 +603,12 @@ function showStep(i){
       const G = lamps[l][h];
       G.g.material.opacity = 0.62 + 0.38*(1-(ent[h]??0.5));            // sharp head = bright glass
       if(G.line){ G.line.position.y = G.top - 1.06*frac; G.line.visible = frac < 0.995; }
+      if(G.shade){                      // the rows it has not written yet
+        const hgt = Math.max(0.001, 1.06*(1-frac));
+        G.shade.scale.y = hgt/1.06;
+        G.shade.position.y = (G.top - 1.06) + hgt/2;
+        G.shade.visible = frac < 0.995;
+      }
     }
   }
   if(inWord){
@@ -639,7 +648,7 @@ function showStep(i){
     x.fillStyle='rgba(6,10,16,.72)'; x.fillRect(0,0,w,hgt);
     x.font='bold 52px ui-monospace,Menlo,monospace'; x.textBaseline='middle';
     let px=8;
-    x.fillStyle='#3f6b8a'; const lab='RESIDUAL STREAM h \u2014 biggest #dimension, value';
+    x.fillStyle='#3f6b8a'; const lab='RESIDUAL h';
     x.fillText(lab, px, hgt/2); px += x.measureText(lab).width + 34;
     for(const [d,v] of (st.r[l]||[])){
       const big=Math.abs(v)>50;
@@ -656,7 +665,7 @@ function showStep(i){
       y.fillStyle='rgba(14,8,6,.72)'; y.fillRect(0,0,ww,hh);
       y.font='bold 44px ui-monospace,Menlo,monospace'; y.textBaseline='middle';
       let qx=8;
-      y.fillStyle='#7a4a30'; const lab2='MLP NEURONS \u2014 loudest #neuron, value';
+      y.fillStyle='#7a4a30'; const lab2='MLP';
       y.fillText(lab2, qx, hh/2); qx += y.measureText(lab2).width + 34;
       for(const [d,v] of (st.n[l]||[])){
         const loud=Math.abs(v)>12;
