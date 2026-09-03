@@ -42,6 +42,11 @@ writes · **your own model**, live, through
 
 `IDDQD` `IDKFA` `IDCLIP` `IDDT` work.
 
+`?auto=6` walks by itself · `?hq=1` renders crisp instead of chunky ·
+`?rec=40` records the canvas for forty seconds and hands you a webm. Keep that
+window in front while it runs — browsers throttle rendering in a window you are
+not looking at, and you get one frame a second instead of thirty.
+
 <details><summary>What is measured and what is not</summary>
 
 The floor plan is invented — a corridor had to be some shape. Every window,

@@ -543,11 +543,11 @@ function buildLevel(){
   // ---- the residual stream, down the middle of the floor ----
   // It is the only thing that runs through every chamber; attention and the MLP
   // each belong to one layer. So it is the ground you walk on, not wall dressing.
-  const TW=1024, TH=150;
+  const TW=1600, TH=190;
   for(let l=0;l<NF;l++){
     const c=document.createElement('canvas'); c.width=TW; c.height=TH;
     const t=new THREE.CanvasTexture(c);
-    t.wrapS=THREE.RepeatWrapping; t.repeat.set(3,1);
+    t.wrapS=THREE.RepeatWrapping; t.repeat.set(1,1);
     const mat=new THREE.MeshBasicMaterial({map:t, transparent:true});
     t.center.set(0.5,0.5); t.rotation = -Math.PI/2;  // reads the way you walk
     { // in the last chamber the numbers stop at the norm: past it the vector is
@@ -645,18 +645,29 @@ function showStep(i){
     if(!near(l)) continue;
     const T=ticker[l], x=T.x, w=T.c.width, hgt=T.c.height;
     x.clearRect(0,0,w,hgt);
-    x.fillStyle='rgba(6,10,16,.72)'; x.fillRect(0,0,w,hgt);
+    x.fillStyle='rgba(6,10,16,.78)'; x.fillRect(0,0,w,hgt);
+    // every dimension, in 64 buckets of max |value|, laid along the chamber:
+    // one pass of this strip is one layer's h, entire. The named ones follow.
+    if(st.p && st.p[l]){
+      const bin=atob(st.p[l]), n=bin.length, cw=w/n;
+      for(let b=0;b<n;b++){
+        const v=Math.pow(bin.charCodeAt(b)/255, 0.55);
+        x.fillStyle='rgba('+Math.round(40+90*v)+','+Math.round(90+150*v)+','
+          +Math.round(130+120*v)+','+(0.18+0.78*v)+')';
+        x.fillRect(b*cw, 4, cw-1, hgt*0.40);
+      }
+    }
     x.font='bold 52px ui-monospace,Menlo,monospace'; x.textBaseline='middle';
     let px=8;
     x.fillStyle='#3f6b8a'; const lab='RESIDUAL h';
-    x.fillText(lab, px, hgt/2); px += x.measureText(lab).width + 34;
+    x.fillText(lab, px, hgt*0.74); px += x.measureText(lab).width + 34;
     for(const [d,v] of (st.r[l]||[])){
       const big=Math.abs(v)>50;
       x.fillStyle = big ? '#ff9b2a' : '#5f87a6';
-      x.fillText('#'+d, px, hgt/2); px += x.measureText('#'+d).width + 7;
+      x.fillText('#'+d, px, hgt*0.74); px += x.measureText('#'+d).width + 7;
       x.fillStyle = big ? '#ffe9b8' : '#a8d2ec';
       const t=(v>0?'+':'')+v.toFixed(1);
-      x.fillText(t, px, hgt/2); px += x.measureText(t).width + 26;
+      x.fillText(t, px, hgt*0.74); px += x.measureText(t).width + 26;
     }
     T.t.needsUpdate = true;
     if(neuron[l]){
@@ -904,6 +915,21 @@ function run(){
   gen.onclick=()=>{ playing=!playing; if(playing&&cur>=WAD.steps.length-1){cur=0;}
     gen.textContent = playing ? 'PAUSE' : (cur>0 ? 'RESUME' : 'GENERATE'); };
   if(AUTO) enter();          // ?auto=1 walks itself, for recording
+  // ?rec=40 records the canvas for 40 s and downloads it. Browsers throttle
+  // rendering in an unfocused window, so this has to run in a window you are
+  // actually looking at - that is the whole reason it lives here.
+  const REC = parseFloat((location.search.match(/rec=([\d.]+)/)||[])[1]);
+  if(REC > 0) setTimeout(()=>{
+    const cv = renderer.domElement;
+    const mr = new MediaRecorder(cv.captureStream(30),
+      {mimeType:'video/webm;codecs=vp9', videoBitsPerSecond:9000000});
+    const chunks=[]; mr.ondataavailable=e=>{ if(e.data.size) chunks.push(e.data); };
+    mr.onstop=()=>{ const b=new Blob(chunks,{type:'video/webm'});
+      const a=document.createElement('a'); a.href=URL.createObjectURL(b);
+      a.download='resi-doom.webm'; a.click(); cheatMsg('SAVED resi-doom.webm'); };
+    mr.start(); cheatMsg('RECORDING '+REC+'s — keep this window in front');
+    setTimeout(()=>mr.stop(), REC*1000);
+  }, 1200);
   tick();
 }
 const tokEl=document.getElementById('tok');
