@@ -17,8 +17,13 @@ in. `W` and `S` walk. That is the control scheme.
   components at that layer, with their indices
 - **orange numbers under them** — the loudest neurons of that layer's MLP
 - **over the door** — the word this layer would say now, with the runner-up
-  beside it when the two are close, and what each half of the block just
-  added: `ATTN 217  MLP 380`
+  beside it when the two are close, and under it `ATTN 217  MLP 380`: the
+  length of the vector each half of the block just added to the stream. Read
+  it as *which half wrote more here*, and nothing else — a big addition is not
+  a big effect, and with a couple of dimensions carrying most of the norm it
+  often means "the MLP wrote a lot into `#2`" rather than "the MLP did a lot".
+  Layers cannot be compared this way either: both halves grow with depth
+  regardless.
 - **how dark a chamber is** — how much of its attention sits on the first token
 
 Two things fell out of the measurement rather than the design.
