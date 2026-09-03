@@ -42,7 +42,7 @@
   #start .dim{color:#3b3128;margin-top:20px;font-size:11px;letter-spacing:2px}
   #hintline{position:fixed;left:0;right:0;top:64px;z-index:6;text-align:center;font-size:13px;
     letter-spacing:1px;color:#cbb08a;text-shadow:0 0 12px #000,0 0 22px #000;opacity:0;
-    transition:opacity 1.2s;pointer-events:none}
+    transition:opacity .55s;pointer-events:none}
   #cheat{position:fixed;left:0;right:0;top:16px;z-index:6;text-align:center;font-size:13px;
     letter-spacing:2px;color:#9dff7a;text-shadow:0 0 12px #000;opacity:0;transition:opacity .5s;
     pointer-events:none}
@@ -867,7 +867,7 @@ function hint(){
   const el=document.getElementById('hintline'); let i=0;
   const show=()=>{ if(i>=HINTS.length){ el.style.opacity=0; return; }
     el.textContent=HINTS[i++]; el.style.opacity=1;
-    setTimeout(()=>{ el.style.opacity=0; setTimeout(show,900); }, 5200); };
+    setTimeout(()=>{ el.style.opacity=0; setTimeout(show,420); }, 4400); };
   show();
 }
 function showGame(on){ inGame=on; document.getElementById('start').hidden=on;
