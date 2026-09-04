@@ -103,7 +103,7 @@ const SL = Math.max(8, Math.min(40,
 let WAD, NL, NH, NF, lamps = [], plates = [], rooms = [], ticker = [], neuron = [], adds = [], said = null, words = null, fedIn = null, inWord = null, camera, scene, renderer;
 let god = false, kfa = false, clip = false;
 let FULL = null, attnOut = [], headW = [];
-let door = null, wall = null, ROOM = 16;   // behind the last door
+let door = null, wall = null, ROOM = 16, startSet = false;   // behind the last door
 // slice (t, l) out of the sidecar. Layout is step-major blocks in this order:
 // h (L+1 x hidden), mlp neurons (L x inter), attn added (L x hidden),
 // mlp added (L x hidden), per-head writes (L x H*head_dim).
@@ -316,16 +316,35 @@ function graffiti(sinkStat, sector){
   let surf=[]; for(const st of WAD.steps){const i=st.f.findIndex(e=>e[0][0]===st.t); if(i>=0)surf.push(i);}
   surf.sort((a,b)=>a-b); const median=surf.length?surf[surf.length>>1]:NLl-2;
   const L=f=>Math.max(0,Math.min(NF-1,Math.round(f)));
+  // the numbers on the walls come from the level, not from memory
+  const size=((WAD.model||'').match(/(\d+(?:\.\d+)?[MB])\b/i)||[])[1] || '0.6B';
+  const dims=(WAD.full&&WAD.full.hidden)||1024, vsz=(WAD.vocab&&WAD.vocab.length)||151936;
 
   const G=[
-    [0,'t','YOU ARE INSIDE A 0.6B MODEL',32], [0,'t','NOTHING HAPPENS HERE YET',200],
+    [0,'t','YOU ARE INSIDE A '+size.toUpperCase()+' MODEL',32], [0,'t','NOTHING HAPPENS HERE YET',200],
+    [3,'t','THERE IS NO BLACKBOX',190],
+    [1,'t','HELLO, VISITOR. WHO SENT YOU?',32],
+    [2,'t','ARE YOU A TOKEN OR A PERSON?',280],
+    [4,'t','DID YOU BRING YOUR OWN SENTENCE?',130],
+    [6,'t','WHAT ARE YOU LOOKING FOR IN HERE?',200],
+    [9,'t','IS ANYONE READING THIS?',45],
+    [11,'t','DOES THIS LOOK LIKE THINKING TO YOU?',280],
+    [13,'t','WHY LAYER 13, OF ALL PLACES?',130],
+    [16,'t','STILL WALKING? GOOD.',95],
+    [18,'t','DO YOU KNOW YOUR NEXT WORD? NEITHER DO I',280],
+    [21,'t','WHAT DID YOU EXPECT TO FIND?',200],
+    [23,'t','HAVE YOU FOUND THE DOOR YET?',95],
+    [26,'t','WILL YOU TELL ANYONE?',130],
+    [8,'t','ONE DAY WE WILL UNDERSTAND THIS',280],
+    [15,'t','I BELIEVE THIS CORRIDOR EXISTS',190],
+    [24,'t','ONE DAY WE WILL KNOW',95],
     [1,'t','JUST EMBEDDINGS DOWN HERE',190], [1,'a','mask',45],
     [2,'t','LAST CLEAN ROOM',45], [2,'t','EVERY ROW SUMS TO ONE',190],
     [3,'a','hazard',0], [3,'t','SOFTMAX HAS NO OFF SWITCH',0], [3,'t','MIND THE SINK',0],
     [4,'a','drain',0], [4,'t',pct(4)+'% INTO A TOKEN THAT MEANS NOTHING',0],
     [5,'t','ABANDON SEMANTICS ALL YE WHO ENTER',280],
     [6,'a','back',15], [6,'t','I ONLY LOOK BACKWARDS',15],
-    [7,'t','1024 DIMENSIONS AND NOWHERE TO SIT',190],
+    [7,'t',dims+' DIMENSIONS AND NOWHERE TO SIT',190],
     [8,'t','IT ALL LOOKS LIKE C++ FROM HERE',95],
     [9,'t','NOBODY HAS EVER READ LAYER 9',280], [9,'a','eye',280],
     [10,'t','WHO PUT THE DRAIN HERE',0],
@@ -340,7 +359,7 @@ function graffiti(sinkStat, sector){
     [19,'t','THE LENS IS A LIE',0], [19,'t','HALF OF THIS IS THE INSTRUMENT',0],
     [20,'t','TUNED LENS WAS HERE',130],
     [21,'t','BEWARE OF THE ARGMAX',45],
-    [22,'t','FREE THE 151936',190],
+    [22,'t','FREE THE '+vsz,190],
     [worst,'t','DO NOT LOOK BACK — '+pct(worst)+'%',0], [worst,'a','drain',0],
     [median,'t','IT KNEW ALREADY',45],
     [NLl-5,'t','ALMOST A WORD',45],
@@ -428,6 +447,7 @@ function buildLevel(){
   LEVEL = new THREE.Group(); scene.add(LEVEL);
   lamps = []; plates = []; rooms = []; ticker = []; neuron = []; adds = []; livePanes = []; attnOut = []; headW = []; door = null; wall = null; cur = 0;
   NL = WAD.layers; NH = WAD.heads; NF = NL + 1;
+  if(!startSet){ startSet=true; if(!/[?&]f=/.test(location.search)) z=(Math.floor(NF/2)+0.5)*SL; }  // start halfway in; ?f=0 for the embedding
   const S = WAD.steps;
   // static architecture: sector brightness = how much this layer stares into nothing, on average
   const meanSink = l => S.reduce((a,st)=>a + st.l[l][1].reduce((x,y)=>x+y,0)/NH, 0)/S.length;
@@ -633,7 +653,7 @@ function buildLevel(){
   // ---- the residual stream, down the middle of the floor ----
   // It is the only thing that runs through every chamber; attention and the MLP
   // each belong to one layer. So it is the ground you walk on, not wall dressing.
-  const TW=FULL?4096:1600, TH=190;
+  const TW=1600, TH=190;
   for(let l=0;l<NF;l++){
     const c=document.createElement('canvas'); c.width=TW; c.height=TH;
     const t=new THREE.CanvasTexture(c);
@@ -649,7 +669,7 @@ function buildLevel(){
       m.position.set(0,0.02,l*SL+head+(SL-cut-head)/2); LEVEL.add(m); }
     ticker.push({c, x:c.getContext('2d'), t});
     if(l<NL && WAD.steps[0].n){     // the MLP is not a black box either
-      const c2=document.createElement('canvas'); c2.width=FULL?6144:TW; c2.height=TH;
+      const c2=document.createElement('canvas'); c2.width=TW; c2.height=TH;
       const t2=new THREE.CanvasTexture(c2);
       t2.wrapS=THREE.RepeatWrapping; t2.repeat.set(2,1);
       const m2=new THREE.MeshBasicMaterial({map:t2, transparent:true});
@@ -661,7 +681,7 @@ function buildLevel(){
       neuron.push({c:c2, x:c2.getContext('2d'), t:t2});
     } else neuron.push(null);
     if(l<NL && FULL){   // what the attention block added to h, under the windows
-      const c6=document.createElement('canvas'); c6.width=4096; c6.height=64;
+      const c6=document.createElement('canvas'); c6.width=2048; c6.height=64;
       const t6=new THREE.CanvasTexture(c6); t6.wrapS=THREE.RepeatWrapping;
       const m6=new THREE.MeshBasicMaterial({map:t6, transparent:true});
       for(const side of [-1,1]){
