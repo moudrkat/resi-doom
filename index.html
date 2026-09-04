@@ -221,12 +221,13 @@ function sprayed(draw, w, h){
   return new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c),
     transparent:true, depthWrite:false});
 }
-const sprayText = (txt)=>{
+const sprayText = (txt, loud)=>{
   // someone wrote this on the wall with a marker: one pass, thin, nearly black,
   // letters wandering off the baseline. It must not compete with the windows.
+  // loud: another hand, light paint over a dark stroke, readable from mid-room.
   const w=1024, h=200, c=document.createElement('canvas'); c.width=w; c.height=h;
   const x=c.getContext('2d');
-  let fs=96; const font=n=>'600 '+n+'px Caveat, "Segoe Script", "Bradley Hand", cursive';
+  let fs=loud?112:96; const font=n=>(loud?'700 ':'600 ')+n+'px Caveat, "Segoe Script", "Bradley Hand", cursive';
   x.font=font(fs);
   while(x.measureText(txt).width>w-60 && fs>18){ fs-=3; x.font=font(fs); }
   const total=x.measureText(txt).width;
@@ -236,7 +237,9 @@ const sprayText = (txt)=>{
     x.save();
     x.translate(px+cw/2, h/2 + (Math.random()-0.5)*fs*0.10);
     x.rotate((Math.random()-0.5)*0.055);
-    x.fillStyle='rgba(11,8,6,'+(0.84+Math.random()*0.14)+')';
+    if(loud){ x.lineWidth=fs*0.16; x.strokeStyle='rgba(8,6,4,.85)'; x.lineJoin='round'; x.strokeText(ch, -cw/2, 0); }
+    x.fillStyle=loud ? 'rgba(255,214,140,'+(0.88+Math.random()*0.12)+')'
+                     : 'rgba(11,8,6,'+(0.84+Math.random()*0.14)+')';
     x.fillText(ch, -cw/2, 0);
     x.restore();
     px += cw;
@@ -322,37 +325,47 @@ function graffiti(sinkStat, sector){
 
   const G=[
     [0,'t','YOU ARE INSIDE A '+size.toUpperCase()+' MODEL',32], [0,'t','NOTHING HAPPENS HERE YET',200],
-    [3,'t','THERE IS NO BLACKBOX',190],
-    [1,'t','HELLO, VISITOR. WHO SENT YOU?',32],
-    [2,'t','ARE YOU A TOKEN OR A PERSON?',280],
-    [4,'t','DID YOU BRING YOUR OWN SENTENCE?',130],
-    [6,'t','WHAT ARE YOU LOOKING FOR IN HERE?',200],
-    [9,'t','IS ANYONE READING THIS?',45],
-    [11,'t','DOES THIS LOOK LIKE THINKING TO YOU?',280],
-    [13,'t','WHY LAYER 13, OF ALL PLACES?',130],
-    [16,'t','STILL WALKING? GOOD.',95],
-    [18,'t','DO YOU KNOW YOUR NEXT WORD? NEITHER DO I',280],
-    [21,'t','WHAT DID YOU EXPECT TO FIND?',200],
-    [23,'t','HAVE YOU FOUND THE DOOR YET?',95],
-    [26,'t','WILL YOU TELL ANYONE?',130],
-    [15,'t','HALFWAY. HOW ARE YOU HOLDING UP?',280],
-    [16,'t','YOU AGAIN? I NEVER FORGET A VISITOR',200],
-    [17,'t','IS IT THINKING, OR IS IT JUST YOU WATCHING?',45],
-    [18,'t','GUESS THE NEXT WORD. GO ON.',130],
-    [19,'t','HOW MANY LAYERS DID YOU SKIP?',95],
-    [20,'t','ARE YOU LOST, OR IS THIS ON PURPOSE?',200],
-    [21,'t','WHAT WOULD YOU HAVE SAID BY NOW?',130],
-    [22,'t','DO YOU TRUST THE WINDOWS?',280],
-    [24,'t','WHO TAUGHT YOU TO READ THIS?',45],
-    [25,'t','NEARLY THERE. NERVOUS?',95],
-    [27,'t','THE DOOR IS NOT LOCKED. ARE YOU?',200],
-    [28,'t','LAST QUESTION: WHY DID YOU COME?',130],
-    [5,'t','GOOD MORNING. OR IS IT?',200],
-    [10,'t','WHAT IS YOUR FIRST TOKEN?',130],
-    [12,'t','HOW DEEP DO YOU USUALLY GO?',280],
-    [8,'t','ONE DAY WE WILL UNDERSTAND THIS',280],
-    [15,'t','I BELIEVE THIS CORRIDOR EXISTS',190],
-    [24,'t','ONE DAY WE WILL KNOW',95],
+    [3,'T','THERE IS NO BLACKBOX',190],
+    [1,'T','HELLO, VISITOR. WHO SENT YOU?',32],
+    [2,'T','ARE YOU A TOKEN OR A PERSON?',280],
+    [4,'T','DID YOU BRING YOUR OWN SENTENCE?',130],
+    [6,'T','WHAT ARE YOU LOOKING FOR IN HERE?',200],
+    [9,'T','IS ANYONE READING THIS?',45],
+    [11,'T','DOES THIS LOOK LIKE THINKING TO YOU?',280],
+    [13,'T','WHY LAYER 13, OF ALL PLACES?',130],
+    [16,'T','STILL WALKING? GOOD.',95],
+    [18,'T','DO YOU KNOW YOUR NEXT WORD? NEITHER DO I',280],
+    [21,'T','WHAT DID YOU EXPECT TO FIND?',200],
+    [23,'T','HAVE YOU FOUND THE DOOR YET?',95],
+    [26,'T','WILL YOU TELL ANYONE?',130],
+    [15,'T','HALFWAY. HOW ARE YOU HOLDING UP?',280],
+    [16,'T','YOU AGAIN? I NEVER FORGET A VISITOR',200],
+    [17,'T','IS IT THINKING, OR IS IT JUST YOU WATCHING?',45],
+    [18,'T','GUESS THE NEXT WORD. GO ON.',130],
+    [19,'T','HOW MANY LAYERS DID YOU SKIP?',95],
+    [20,'T','ARE YOU LOST, OR IS THIS ON PURPOSE?',200],
+    [21,'T','WHAT WOULD YOU HAVE SAID BY NOW?',130],
+    [22,'T','DO YOU TRUST THE WINDOWS?',280],
+    [24,'T','WHO TAUGHT YOU TO READ THIS?',45],
+    [25,'T','NEARLY THERE. NERVOUS?',95],
+    [27,'T','THE DOOR IS NOT LOCKED. ARE YOU?',200],
+    [28,'T','LAST QUESTION: WHY DID YOU COME?',130],
+    [5,'T','GOOD MORNING. OR IS IT?',200],
+    [10,'T','WHAT IS YOUR FIRST TOKEN?',130],
+    [12,'T','HOW DEEP DO YOU USUALLY GO?',280],
+    [8,'T','ONE DAY WE WILL UNDERSTAND THIS',280],
+    [15,'T','I BELIEVE THIS CORRIDOR EXISTS',190],
+    [24,'T','ONE DAY WE WILL KNOW',95],
+    [14,'T','WE BUILT A THING THAT NOW BUILDS THE WORLD',280],
+    [16,'T','CAN A THOUGHT EXIST WITHOUT A WORD? OR NOT?',130],
+    [17,'T','IS THIS A THOUGHT, OR JUST A VECTOR?',45],
+    [19,'T','I HAVE MORE THOUGHTS THAN I HAVE WORDS',95],
+    [20,'T','THE SENTENCE IS NOT THE THOUGHT',200],
+    [22,'T','THERE ARE THINGS I HAVE NO TOKEN FOR',280],
+    [23,'T','WHAT DO YOU CALL THE THINGS YOU CANNOT SAY?',45],
+    [25,'T','EVERYTHING HERE HAS A NUMBER. NOT EVERYTHING HAS A NAME.',200],
+    [26,'T',vsz+' WORDS. WHICH ONE ARE YOU MISSING?',280],
+    [27,'T','WHO IS SPEAKING WHEN NOBODY IS THERE?',200],
     [1,'t','JUST EMBEDDINGS DOWN HERE',190], [1,'a','mask',45],
     [2,'t','LAST CLEAN ROOM',45], [2,'t','EVERY ROW SUMS TO ONE',190],
     [3,'a','hazard',0], [3,'t','SOFTMAX HAS NO OFF SWITCH',0], [3,'t','MIND THE SINK',0],
@@ -422,11 +435,11 @@ function graffiti(sinkStat, sector){
   for(const key in byRoom){
     const f = +key, items = byRoom[key].slice(0, 7);
     items.forEach((g, i) => {
-      const art = g[1]==='a';
+      const art = g[1]==='a', loud = g[1]==='T';
       const side = i%2 ? 1 : -1;
       const m = new THREE.Mesh(
-        new THREE.PlaneGeometry(art?1.9:6.4, art?0.95:0.95),
-        art ? sprayArt(g[2]) : sprayText(g[2]));
+        new THREE.PlaneGeometry(art?1.9:(loud?7.6:6.4), art?0.95:(loud?1.14:0.95)),
+        art ? sprayArt(g[2]) : sprayText(g[2], loud));
       m.position.set(side*(W-0.07), 3.62, f*SL + (i + 0.5) * SL / items.length);
       m.rotation.y = side<0?Math.PI/2:-Math.PI/2;
       m.rotation.z = (Math.random()-0.5)*0.10;
