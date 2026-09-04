@@ -349,7 +349,7 @@ function graffiti(sinkStat, sector){
     [24,'T','WHO TAUGHT YOU TO READ THIS?',45],
     [25,'T','NEARLY THERE. NERVOUS?',95],
     [27,'T','THE DOOR IS NOT LOCKED. ARE YOU?',200],
-    [28,'T','LAST QUESTION: WHY DID YOU COME?',130],
+    [NLl,'T','LAST QUESTION: WHY DID YOU COME?',130],
     [5,'T','GOOD MORNING. OR IS IT?',200],
     [10,'T','WHAT IS YOUR FIRST TOKEN?',130],
     [12,'T','HOW DEEP DO YOU USUALLY GO?',280],
@@ -432,19 +432,32 @@ function graffiti(sinkStat, sector){
   // dropping each one wherever a modulo landed put them on top of each other
   const byRoom = {};
   for(const g of G){ const f=L(g[0]); (byRoom[f] = byRoom[f] || []).push(g); }
+  // two rows above the windows, both walls, and every piece kept whole
+  // inside its own chamber - the door frames used to swallow the ends
+  const TXW=6.4, ART=1.9, PAD=0.25;
   for(const key in byRoom){
-    const f = +key, items = byRoom[key].slice(0, 7);
-    items.forEach((g, i) => {
-      const art = g[1]==='a', loud = g[1]==='T';
-      const side = i%2 ? 1 : -1;
-      const m = new THREE.Mesh(
-        new THREE.PlaneGeometry(art?1.9:(loud?7.6:6.4), art?0.95:(loud?1.14:0.95)),
-        art ? sprayArt(g[2]) : sprayText(g[2], loud));
-      m.position.set(side*(W-0.07), 3.62, f*SL + (i + 0.5) * SL / items.length);
-      m.rotation.y = side<0?Math.PI/2:-Math.PI/2;
-      m.rotation.z = (Math.random()-0.5)*0.10;
-      LEVEL.add(m);
-    });
+    const f = +key, items = byRoom[key].slice(0, 8);
+    const groups = {};   // (side,row) -> its pieces
+    items.forEach((g, i) => { const k=(i%2)+':'+((i>>1)%2); (groups[k] = groups[k] || []).push(g); });
+    for(const k in groups){
+      const [sd,rw] = k.split(':').map(Number), side = sd ? 1 : -1, y = rw ? 3.22 : 3.98;
+      const list = groups[k];
+      const widths = list.map(g => g[1]==='a' ? ART : TXW);
+      const total = widths.reduce((a,b)=>a+b,0), free = Math.max(0, SL - 2*PAD - total);
+      const gap = free / (list.length + 1);
+      let zc = f*SL + PAD + gap;
+      list.forEach((g, j) => {
+        const art = g[1]==='a', loud = g[1]==='T', w = widths[j];
+        const m = new THREE.Mesh(
+          new THREE.PlaneGeometry(w, art?0.95:(loud?1.05:0.9)),
+          art ? sprayArt(g[2]) : sprayText(g[2], loud));
+        m.position.set(side*(W-0.07), y, Math.min(f*SL+SL-PAD-w/2, zc + w/2));
+        m.rotation.y = side<0?Math.PI/2:-Math.PI/2;
+        m.rotation.z = (Math.random()-0.5)*0.08;
+        LEVEL.add(m);
+        zc += w + gap;
+      });
+    }
   }
 }
 
