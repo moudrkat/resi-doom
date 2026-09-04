@@ -886,13 +886,14 @@ function run(){
   if(started) return;   // buildLevel may run again on a mode switch
   started=true;
   const start=document.getElementById('start');
-  start.onclick=e=>{ if(e.target.closest('#modes,#mform')) return; enter(); };
+  let begin=enter; // with ?rec this becomes "ask to share the tab, then enter"
+  start.onclick=e=>{ if(e.target.closest('#modes,#mform')) return; begin(); };
   const form=document.getElementById('mform'); form.innerHTML='';
   document.querySelectorAll('.mb').forEach(b=>b.onclick=()=>{
     document.querySelectorAll('.mb').forEach(x=>x.classList.remove('on'));
     b.classList.add('on'); form.innerHTML=''; stat('');
     const m=b.dataset.m;
-    if(m==='recorded'){ enter(); return; }
+    if(m==='recorded'){ begin(); return; }
     const inp=document.createElement('input');
     inp.value = m==='live' ? 'Explain in detail, step by step, why a raindrop disappears when it lands on a window that is already wet. First,'
                            : 'http://localhost:8010';
@@ -914,22 +915,40 @@ function run(){
   const gen=document.getElementById('gen');
   gen.onclick=()=>{ playing=!playing; if(playing&&cur>=WAD.steps.length-1){cur=0;}
     gen.textContent = playing ? 'PAUSE' : (cur>0 ? 'RESUME' : 'GENERATE'); };
-  if(AUTO) enter();          // ?auto=1 walks itself, for recording
-  // ?rec=40 records the canvas for 40 s and downloads it. Browsers throttle
-  // rendering in an unfocused window, so this has to run in a window you are
-  // actually looking at - that is the whole reason it lives here.
+  // ?rec=40 records this tab for 40 s and downloads it. The whole tab, not the
+  // canvas: the bar, the caption and the hints are HTML on top of the canvas
+  // and a canvas stream never sees them. Tab capture needs a click, so with
+  // ?rec the start screen waits for one and Chrome asks once to share the tab.
+  // Browsers throttle rendering in an unfocused window, so this has to run in
+  // a window you are actually looking at - that is the whole reason it lives here.
   const REC = parseFloat((location.search.match(/rec=([\d.]+)/)||[])[1]);
-  if(REC > 0) setTimeout(()=>{
-    const cv = renderer.domElement;
-    const mr = new MediaRecorder(cv.captureStream(30),
-      {mimeType:'video/webm;codecs=vp9', videoBitsPerSecond:9000000});
+  const record=stream=>{
+    const mr = new MediaRecorder(stream,
+      {mimeType:'video/webm;codecs=vp9', videoBitsPerSecond:12000000});
     const chunks=[]; mr.ondataavailable=e=>{ if(e.data.size) chunks.push(e.data); };
-    mr.onstop=()=>{ const b=new Blob(chunks,{type:'video/webm'});
+    mr.onstop=()=>{ stream.getTracks().forEach(t=>t.stop());
+      const b=new Blob(chunks,{type:'video/webm'});
       const a=document.createElement('a'); a.href=URL.createObjectURL(b);
       a.download='resi-doom.webm'; a.click(); cheatMsg('SAVED resi-doom.webm'); };
     mr.start(); cheatMsg('RECORDING '+REC+'s — keep this window in front');
-    setTimeout(()=>mr.stop(), REC*1000);
-  }, 1200);
+    const stop=()=>{ if(mr.state!=='inactive') mr.stop(); };
+    stream.getVideoTracks()[0].onended=stop;    // "stop sharing" ends it early
+    setTimeout(stop, REC*1000);
+  };
+  if(REC > 0){
+    const p=document.querySelector('#start .dim');
+    if(p) p.textContent='CLICK TO RECORD '+REC+'s OF THIS TAB';
+    begin=async()=>{
+      begin=enter;
+      let stream=null;
+      try{ stream=await navigator.mediaDevices.getDisplayMedia({audio:false,
+        video:{frameRate:30}, preferCurrentTab:true, selfBrowserSurface:'include',
+        surfaceSwitching:'exclude', monitorTypeSurfaces:'exclude'}); }
+      catch(_){ stream=renderer.domElement.captureStream(30); }  // canvas only
+      enter();
+      setTimeout(()=>record(stream), 600);
+    };
+  } else if(AUTO) enter();   // ?auto=1 walks itself, for recording
   tick();
 }
 const tokEl=document.getElementById('tok');

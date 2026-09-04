@@ -48,9 +48,10 @@ writes · **your own model**, live, through
 `IDDQD` `IDKFA` `IDCLIP` `IDDT` work.
 
 `?auto=6` walks by itself · `?hq=1` renders crisp instead of chunky ·
-`?rec=40` records the canvas for forty seconds and hands you a webm. Keep that
-window in front while it runs — browsers throttle rendering in a window you are
-not looking at, and you get one frame a second instead of thirty.
+`?rec=40` records the tab for forty seconds and hands you a webm — the whole
+tab, bar and captions included, so Chrome asks once to share it; click Share.
+Keep that window in front while it runs — browsers throttle rendering in a
+window you are not looking at, and you get one frame a second instead of thirty.
 
 <details><summary>What is measured and what is not</summary>
 
