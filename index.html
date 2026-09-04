@@ -335,6 +335,21 @@ function graffiti(sinkStat, sector){
     [21,'t','WHAT DID YOU EXPECT TO FIND?',200],
     [23,'t','HAVE YOU FOUND THE DOOR YET?',95],
     [26,'t','WILL YOU TELL ANYONE?',130],
+    [15,'t','HALFWAY. HOW ARE YOU HOLDING UP?',280],
+    [16,'t','YOU AGAIN? I NEVER FORGET A VISITOR',200],
+    [17,'t','IS IT THINKING, OR IS IT JUST YOU WATCHING?',45],
+    [18,'t','GUESS THE NEXT WORD. GO ON.',130],
+    [19,'t','HOW MANY LAYERS DID YOU SKIP?',95],
+    [20,'t','ARE YOU LOST, OR IS THIS ON PURPOSE?',200],
+    [21,'t','WHAT WOULD YOU HAVE SAID BY NOW?',130],
+    [22,'t','DO YOU TRUST THE WINDOWS?',280],
+    [24,'t','WHO TAUGHT YOU TO READ THIS?',45],
+    [25,'t','NEARLY THERE. NERVOUS?',95],
+    [27,'t','THE DOOR IS NOT LOCKED. ARE YOU?',200],
+    [28,'t','LAST QUESTION: WHY DID YOU COME?',130],
+    [5,'t','GOOD MORNING. OR IS IT?',200],
+    [10,'t','WHAT IS YOUR FIRST TOKEN?',130],
+    [12,'t','HOW DEEP DO YOU USUALLY GO?',280],
     [8,'t','ONE DAY WE WILL UNDERSTAND THIS',280],
     [15,'t','I BELIEVE THIS CORRIDOR EXISTS',190],
     [24,'t','ONE DAY WE WILL KNOW',95],
@@ -405,7 +420,7 @@ function graffiti(sinkStat, sector){
   const byRoom = {};
   for(const g of G){ const f=L(g[0]); (byRoom[f] = byRoom[f] || []).push(g); }
   for(const key in byRoom){
-    const f = +key, items = byRoom[key].slice(0, 5);
+    const f = +key, items = byRoom[key].slice(0, 7);
     items.forEach((g, i) => {
       const art = g[1]==='a';
       const side = i%2 ? 1 : -1;
@@ -568,7 +583,7 @@ function buildLevel(){
       const cp=makePlate(1024,232);   // the one it said, on the floor before the wall
       const cm=new THREE.Mesh(new THREE.PlaneGeometry(7.2,1.63),cp.mat);
       cm.rotation.set(-Math.PI/2,0,Math.PI); cm.position.set(0,0.04,zFar-2.6); LEVEL.add(cm);
-      wall={gc, gx:gc.getContext('2d'), gt, plate:cp, drawn:-1};
+      wall={gc, gx:gc.getContext('2d'), gt, plate:cp, drawn:-1, plateZ:zFar-2.6, onPlate:false};
     }
     for(const [dz,txt] of [[SL*0.75,'RMSNORM  \u2192  RESCALED'],
                            [SL*0.36,'\u00D7 UNEMBEDDING  \u2192  151936 WORDS']]){
@@ -1172,6 +1187,11 @@ function frame(now){
     if(door && door.open && door.m.position.y < door.y0+door.DH+0.3){
       door.m.position.y += dt*2.6; }
     if(door && z > door.zEnd-1.5 && wall && wall.drawn!==cur) drawWall(cur);
+    if(wall && door && door.open){   // step on the word on the floor: it all runs again
+      const on = Math.abs(z-wall.plateZ) < 0.9;
+      if(on && !wall.onPlate){ cur=0; showStep(0); pulse=0; playing=true;
+        document.getElementById('gen').textContent='PAUSE'; cheatMsg('AGAIN, FROM THE FIRST WORD'); }
+      wall.onPlate=on; }
     free.set(0,1.72,z);
     camera.position.set(Math.sin(bob*0.5)*0.07*moving, 1.72+Math.sin(bob)*0.055*moving, z);
   }
