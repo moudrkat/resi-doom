@@ -6,3 +6,6 @@ model/*.onnx
 model/*.data
 *.onnx
 *.onnx.data
+wad_smol.*
+wad_qwen.*
+.idea/

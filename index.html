@@ -102,11 +102,47 @@ const SL = Math.max(8, Math.min(40,
   parseFloat((location.search.match(/len=([\d.]+)/)||[])[1]) || 20));
 let WAD, NL, NH, NF, lamps = [], plates = [], rooms = [], ticker = [], neuron = [], adds = [], said = null, words = null, fedIn = null, inWord = null, camera, scene, renderer;
 let god = false, kfa = false, clip = false;
+let FULL = null, attnOut = [], headW = [];
+let door = null, wall = null, ROOM = 16;   // behind the last door
+// slice (t, l) out of the sidecar. Layout is step-major blocks in this order:
+// h (L+1 x hidden), mlp neurons (L x inter), attn added (L x hidden),
+// mlp added (L x hidden), per-head writes (L x H*head_dim).
+function fullVec(kind, t, l){
+  if(!FULL || !WAD.full) return null;
+  const F=WAD.full, S=WAD.steps.length, L=WAD.layers, DH=F.hidden, DM=F.inter, DW=F.headwrite;
+  const bR=0, bM=bR+S*(L+1)*DH, bA=bM+S*L*DM, bO=bA+S*L*DH, bH=bO+S*L*DH;
+  let off, n, sc;
+  if(kind==='h'){ off=bR+(t*(L+1)+l)*DH; n=DH; sc=F.rscale[t][l]; }
+  else if(kind==='mlp'){ off=bM+(t*L+l)*DM; n=DM; sc=F.mscale[t][l]; }
+  else if(kind==='attn+'){ off=bA+(t*L+l)*DH; n=DH; sc=F.ascale[t][l]; }
+  else if(kind==='mlp+'){ off=bO+(t*L+l)*DH; n=DH; sc=F.oscale[t][l]; }
+  else { off=bH+(t*L+l)*DW; n=DW; sc=F.hscale[t][l]; }
+  return {q:FULL.subarray(off, off+n), scale:sc};
+}
+// one cell per value: blue above zero, orange below, brightness = |value| / max
+function band(x, q, x0, y0, w, h){
+  const n=q.length, cw=w/n;
+  for(let i=0;i<n;i++){
+    const v=q[i]/127, a=Math.pow(Math.abs(v),0.55);
+    x.fillStyle = v>=0 ? 'rgba('+Math.round(40+90*a)+','+Math.round(90+150*a)+','+Math.round(130+120*a)+','+(0.15+0.85*a)+')'
+                       : 'rgba('+Math.round(120+135*a)+','+Math.round(60+90*a)+','+Math.round(30+30*a)+','+(0.15+0.85*a)+')';
+    x.fillRect(x0+i*cw, y0, Math.max(cw,1), h);
+  }
+}
 let LEVEL = null, mode = 'recorded', sinkOf = ()=>0, livePanes = [];
 
 Promise.all([fetch('wad.json').then(r=>r.json()),
   (document.fonts ? document.fonts.load("600 60px Caveat").catch(()=>{}) : 0)])
-  .then(([w]) => { WAD = w; build(); });
+  .then(async ([w]) => {
+    WAD = w;
+    // everything: every residual dimension, every MLP neuron, what each block
+    // added and what each head wrote — int8, one flat file beside the level
+    if(w.full && w.full.file){
+      try{ FULL = new Int8Array(await fetch(w.full.file).then(r=>r.arrayBuffer())); }
+      catch(e){ console.warn('no', w.full.file, e); FULL = null; }
+    }
+    build();
+  });
 
 // ---------- textures ----------
 function tex(kind){
@@ -390,7 +426,7 @@ function buildLevel(){
     LEVEL.traverse(o=>{ if(o.geometry) o.geometry.dispose();
       if(o.material){ if(o.material.map) o.material.map.dispose(); o.material.dispose(); } }); }
   LEVEL = new THREE.Group(); scene.add(LEVEL);
-  lamps = []; plates = []; rooms = []; ticker = []; neuron = []; adds = []; livePanes = []; cur = 0;
+  lamps = []; plates = []; rooms = []; ticker = []; neuron = []; adds = []; livePanes = []; attnOut = []; headW = []; door = null; wall = null; cur = 0;
   NL = WAD.layers; NH = WAD.heads; NF = NL + 1;
   const S = WAD.steps;
   // static architecture: sector brightness = how much this layer stares into nothing, on average
@@ -465,9 +501,54 @@ function buildLevel(){
   // the norm rescales it and the unembedding multiplies it by the vocabulary,
   // which is where it stops being a vector. So they are painted across it
   // without a plus, and the wall above shows only the result.
-  { const zEnd=NF*SL;
-    const back=surf(wallTex,W*2,H,[5,1],1.0,[1,0.93,0.82]);
-    back.position.set(0,H/2,zEnd); back.rotation.y=Math.PI; LEVEL.add(back);
+  { const zEnd=NF*SL, DW=0.95, DH=2.4;   // a door in the end wall, Doom-sized
+    for(const [w,h,cx,cy] of [[W-DW,H,-(W+DW)/2,H/2],[W-DW,H,(W+DW)/2,H/2],[2*DW,H-DH,0,DH+(H-DH)/2]]){
+      const b=surf(wallTex,w,h,[5*w/(W*2),1],1.0,[1,0.93,0.82]);
+      b.position.set(cx,cy,zEnd); b.rotation.y=Math.PI; LEVEL.add(b); }
+    if(WAD.vocab && WAD.steps[0].top){
+      // the door itself: dark, one thin line of light under it. It opens when
+      // you reach it, and never in ?auto mode - a recording stops at the door.
+      const dc=document.createElement('canvas'); dc.width=256; dc.height=320;
+      const dx=dc.getContext('2d'); dx.fillStyle='#120d09'; dx.fillRect(0,0,256,320);
+      dx.strokeStyle='#3a2c1c'; dx.lineWidth=10; dx.strokeRect(8,8,240,304);
+      dx.fillStyle='#4a3a26'; for(let yy=40;yy<300;yy+=52) dx.fillRect(28,yy,200,6);
+      dx.fillStyle='#ffe2a0'; dx.fillRect(0,314,256,6);
+      const dm=new THREE.Mesh(new THREE.PlaneGeometry(2*DW,DH),
+        new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(dc)}));
+      dm.position.set(0,DH/2,zEnd-0.03); dm.rotation.y=Math.PI; LEVEL.add(dm);
+      door={m:dm, open:false, y0:DH/2, DH, zEnd};
+      // the room: every word the model could have said, on the far wall
+      const RW=W*1.5, zFar=zEnd+ROOM;
+      const fl=surf(floorTex,RW*2,ROOM,[4,4],0.55,[1,1,1]); fl.rotation.x=-Math.PI/2; fl.position.set(0,0,zEnd+ROOM/2); LEVEL.add(fl);
+      const ce=surf(floorTex,RW*2,ROOM,[4,4],0.18,[1,1,1]); ce.rotation.x= Math.PI/2; ce.position.set(0,H,zEnd+ROOM/2); LEVEL.add(ce);
+      const sl=surf(wallTex,ROOM,H,[5,1],0.55,[1,0.93,0.82]); sl.rotation.y= Math.PI/2; sl.position.set(-RW,H/2,zEnd+ROOM/2); LEVEL.add(sl);
+      const sr=surf(wallTex,ROOM,H,[5,1],0.55,[1,0.93,0.82]); sr.rotation.y=-Math.PI/2; sr.position.set( RW,H/2,zEnd+ROOM/2); LEVEL.add(sr);
+      // the wall behind you, seen from the room side, with the door hole in it
+      for(const [w,h,cx,cy] of [[RW-DW,H,-(RW+DW)/2,H/2],[RW-DW,H,(RW+DW)/2,H/2],[2*DW,H-DH,0,DH+(H-DH)/2]]){
+        const b=surf(wallTex,w,h,[3,1],0.5,[1,0.93,0.82]); b.position.set(cx,cy,zEnd+0.02); LEVEL.add(b); }
+      // 49k words, once, tiny: the whole vocabulary. Positions kept for the glow.
+      const VC=4096, vc=document.createElement('canvas'); vc.width=vc.height=VC;
+      const vx=vc.getContext('2d'); vx.fillStyle='#0a0806'; vx.fillRect(0,0,VC,VC);
+      vx.font='10px ui-monospace,Menlo,monospace'; vx.textBaseline='top'; vx.fillStyle='#5c5148';
+      const pos=new Array(WAD.vocab.length); let px=6, py=6; const LH=10;
+      for(let i=0;i<WAD.vocab.length;i++){
+        const t=(WAD.vocab[i]||'').replace(/\s+/g,'\u00b7').slice(0,14); const tw=vx.measureText(t).width;
+        if(px+tw>VC-6){ px=6; py+=LH; if(py>VC-LH) break; }
+        vx.fillText(t,px,py); pos[i]=[px,py,tw]; px+=tw+7;
+      }
+      const vt=new THREE.CanvasTexture(vc); vt.minFilter=THREE.LinearFilter;
+      const vm=new THREE.Mesh(new THREE.PlaneGeometry(RW*2,H),new THREE.MeshBasicMaterial({map:vt}));
+      vm.position.set(0,H/2,zFar); vm.rotation.y=Math.PI; LEVEL.add(vm);
+      const gc=document.createElement('canvas'); gc.width=gc.height=1024;
+      const gt=new THREE.CanvasTexture(gc);
+      const gm=new THREE.Mesh(new THREE.PlaneGeometry(RW*2,H),
+        new THREE.MeshBasicMaterial({map:gt, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false}));
+      gm.position.set(0,H/2,zFar-0.03); gm.rotation.y=Math.PI; LEVEL.add(gm);
+      const cp=makePlate(1024,232);   // the one it said, on the floor before the wall
+      const cm=new THREE.Mesh(new THREE.PlaneGeometry(7.2,1.63),cp.mat);
+      cm.rotation.set(-Math.PI/2,0,Math.PI); cm.position.set(0,0.04,zFar-2.6); LEVEL.add(cm);
+      wall={pos, gc, gx:gc.getContext('2d'), gt, VC, plate:cp, drawn:-1};
+    }
     for(const [dz,txt] of [[SL*0.75,'RMSNORM  \u2192  RESCALED'],
                            [SL*0.36,'\u00D7 UNEMBEDDING  \u2192  151936 WORDS']]){
       const fp=makePlate(768,64); drawPlate(fp,txt,false);
@@ -484,7 +565,7 @@ function buildLevel(){
       words={c:c3, x:c3.getContext('2d'), t:t3}; }
     const sp=makePlate(1024,232); drawPlate(sp, '', true);       // what came out
     const sm=new THREE.Mesh(new THREE.PlaneGeometry(8.2,1.86),sp.mat);
-    sm.position.set(0,2.6,zEnd-0.07); sm.rotation.y=Math.PI; LEVEL.add(sm); said=sp; }
+    sm.position.set(0,door?3.3:2.6,zEnd-0.07); sm.rotation.y=Math.PI; LEVEL.add(sm); said=sp; }
 
 
   // ---- one window per attention head: its whole attention matrix, as glass ----
@@ -536,6 +617,14 @@ function buildLevel(){
         new THREE.MeshBasicMaterial({color:0x0b0805, transparent:true, opacity:0.58}));
       sh.position.set(side*(W-0.11), 2.35, z); sh.rotation.y=g.rotation.y;
       LEVEL.add(fm,g,lm,sh,ln); row.push({g, line:ln, shade:sh, top:2.35+0.53});
+      if(FULL){   // what this head wrote at this step, before o_proj: head_dim values
+        const c5=document.createElement('canvas'); c5.width=512; c5.height=24;
+        const t5=new THREE.CanvasTexture(c5); t5.magFilter=THREE.NearestFilter;
+        const m5=new THREE.Mesh(new THREE.PlaneGeometry(1.06,0.09),
+          new THREE.MeshBasicMaterial({map:t5, transparent:true}));
+        m5.position.set(side*(W-0.06),1.47,z); m5.rotation.y=g.rotation.y; LEVEL.add(m5);
+        (headW[l] ||= [])[h] = {c:c5, x:c5.getContext('2d'), t:t5};
+      }
     }
     lamps.push(row);
   }
@@ -543,7 +632,7 @@ function buildLevel(){
   // ---- the residual stream, down the middle of the floor ----
   // It is the only thing that runs through every chamber; attention and the MLP
   // each belong to one layer. So it is the ground you walk on, not wall dressing.
-  const TW=1600, TH=190;
+  const TW=FULL?4096:1600, TH=190;
   for(let l=0;l<NF;l++){
     const c=document.createElement('canvas'); c.width=TW; c.height=TH;
     const t=new THREE.CanvasTexture(c);
@@ -559,7 +648,7 @@ function buildLevel(){
       m.position.set(0,0.02,l*SL+head+(SL-cut-head)/2); LEVEL.add(m); }
     ticker.push({c, x:c.getContext('2d'), t});
     if(l<NL && WAD.steps[0].n){     // the MLP is not a black box either
-      const c2=document.createElement('canvas'); c2.width=TW; c2.height=TH;
+      const c2=document.createElement('canvas'); c2.width=FULL?6144:TW; c2.height=TH;
       const t2=new THREE.CanvasTexture(c2);
       t2.wrapS=THREE.RepeatWrapping; t2.repeat.set(2,1);
       const m2=new THREE.MeshBasicMaterial({map:t2, transparent:true});
@@ -570,6 +659,17 @@ function buildLevel(){
       }
       neuron.push({c:c2, x:c2.getContext('2d'), t:t2});
     } else neuron.push(null);
+    if(l<NL && FULL){   // what the attention block added to h, under the windows
+      const c6=document.createElement('canvas'); c6.width=4096; c6.height=64;
+      const t6=new THREE.CanvasTexture(c6); t6.wrapS=THREE.RepeatWrapping;
+      const m6=new THREE.MeshBasicMaterial({map:t6, transparent:true});
+      for(const side of [-1,1]){
+        const m=new THREE.Mesh(new THREE.PlaneGeometry(SL*0.62-2.0,0.22),m6);
+        m.position.set(side*(W-0.04),1.24,l*SL+2.0+(SL*0.62-2.0)/2-0.6);
+        m.rotation.y = side<0?Math.PI/2:-Math.PI/2; LEVEL.add(m);
+      }
+      attnOut.push({c:c6, x:c6.getContext('2d'), t:t6});
+    } else attnOut.push(null);
   }
 
   graffiti(sinkStat, sector);
@@ -648,7 +748,9 @@ function showStep(i){
     x.fillStyle='rgba(6,10,16,.78)'; x.fillRect(0,0,w,hgt);
     // every dimension, in 64 buckets of max |value|, laid along the chamber:
     // one pass of this strip is one layer's h, entire. The named ones follow.
-    if(st.p && st.p[l]){
+    const fh = FULL ? fullVec('h', i, l) : null;
+    if(fh){ band(x, fh.q, 0, 4, w, hgt*0.40); }
+    else if(st.p && st.p[l]){
       const bin=atob(st.p[l]), n=bin.length, cw=w/n;
       for(let b=0;b<n;b++){
         const v=Math.pow(bin.charCodeAt(b)/255, 0.55);
@@ -674,22 +776,56 @@ function showStep(i){
       const N=neuron[l], y=N.x, ww=N.c.width, hh=N.c.height;
       y.clearRect(0,0,ww,hh);
       y.fillStyle='rgba(14,8,6,.72)'; y.fillRect(0,0,ww,hh);
+      const fm = FULL ? fullVec('mlp', i, l) : null, fo = FULL ? fullVec('mlp+', i, l) : null;
+      if(fm){ band(y, fm.q, 0, 4, ww, hh*0.34); }          // every neuron, after the gate
+      if(fo){ band(y, fo.q, 0, 4+hh*0.36, ww, hh*0.16); }  // what the block added to h
       y.font='bold 44px ui-monospace,Menlo,monospace'; y.textBaseline='middle';
-      let qx=8;
+      let qx=8; const ty = fm ? hh*0.80 : hh/2;
       y.fillStyle='#7a4a30'; const lab2='MLP';
-      y.fillText(lab2, qx, hh/2); qx += y.measureText(lab2).width + 34;
+      y.fillText(lab2, qx, ty); qx += y.measureText(lab2).width + 34;
       for(const [d,v] of (st.n[l]||[])){
         const loud=Math.abs(v)>12;
         y.fillStyle = loud ? '#ff7a45' : '#8a6a55';
-        y.fillText('n'+d, qx, hh/2); qx += y.measureText('n'+d).width + 7;
+        y.fillText('n'+d, qx, ty); qx += y.measureText('n'+d).width + 7;
         y.fillStyle = loud ? '#ffd0b0' : '#c0a08a';
         const tx=(v>0?'+':'')+v.toFixed(1);
-        y.fillText(tx, qx, hh/2); qx += y.measureText(tx).width + 26;
+        y.fillText(tx, qx, ty); qx += y.measureText(tx).width + 26;
       }
       N.t.needsUpdate = true;
     }
+    if(attnOut[l]){                                   // what attention added to h
+      const A=attnOut[l], fa=fullVec('attn+', i, l);
+      A.x.clearRect(0,0,A.c.width,A.c.height);
+      A.x.fillStyle='rgba(6,10,16,.7)'; A.x.fillRect(0,0,A.c.width,A.c.height);
+      if(fa) band(A.x, fa.q, 0, 4, A.c.width, A.c.height-8);
+      A.t.needsUpdate = true;
+    }
+    if(headW[l]){                                     // what each head wrote
+      const fw=fullVec('head', i, l);
+      if(fw){ const hd=fw.q.length/NH;
+        for(let h=0;h<NH;h++){ const S6=headW[l][h]; if(!S6) continue;
+          S6.x.clearRect(0,0,S6.c.width,S6.c.height);
+          band(S6.x, fw.q.subarray(h*hd,(h+1)*hd), 0, 0, S6.c.width, S6.c.height);
+          S6.t.needsUpdate = true; } }
+    }
   }
   cur = i;
+  if(wall && door && z > door.zEnd-1.5) drawWall(i);
+}
+// the wall of words: 200 candidates lit by probability, the one it said brightest
+function drawWall(i){
+  const st=WAD.steps[i]; if(!st.top || wall.drawn===i) return; wall.drawn=i;
+  const g=wall.gx, k=wall.gc.width/wall.VC; g.clearRect(0,0,wall.gc.width,wall.gc.height);
+  const top=st.top;
+  for(let j=top.length-1;j>=0;j--){
+    const [id,p]=top[j], ps=wall.pos[id]; if(!ps) continue;
+    const a=Math.pow(p,0.45), pad=(j===0?10:3);
+    g.fillStyle='rgba(255,'+Math.round(150+80*a)+','+Math.round(40+60*a)+','+(0.12+0.88*a)+')';
+    g.fillRect(ps[0]*k-pad, ps[1]*k-pad, ps[2]*k+2*pad, 10*k+2*pad);
+  }
+  wall.gt.needsUpdate=true;
+  const [id,p]=top[0], w=(WAD.vocab[id]||'').replace(/\n/g,'⏎');
+  drawPlate(wall.plate, (w.trim()||'␣')+'   p='+p.toFixed(2), true);
 }
 
 // ---------- live: run the model here, compile the level as it speaks ----------
@@ -996,7 +1132,13 @@ function frame(now){
     free.addScaledVector(d, fwd*sp*dt*1.7); z=free.z;
     camera.position.copy(free);
   } else {
-    z=Math.max(0.8,Math.min(NF*SL-1.2, z+fwd*sp*dt));
+    if(door && !door.open && !AUTO && z > door.zEnd-2.6 && fwd>0){
+      door.open=true; cheatMsg('THE DOOR OPENS'); }
+    const zMax = (door && door.open) ? door.zEnd+ROOM-1.4 : NF*SL-1.2;
+    z=Math.max(0.8,Math.min(zMax, z+fwd*sp*dt));
+    if(door && door.open && door.m.position.y < door.y0+door.DH+0.3){
+      door.m.position.y += dt*2.6; }
+    if(door && z > door.zEnd-1.5 && wall && wall.drawn!==cur) drawWall(cur);
     free.set(0,1.72,z);
     camera.position.set(Math.sin(bob*0.5)*0.07*moving, 1.72+Math.sin(bob)*0.055*moving, z);
   }
