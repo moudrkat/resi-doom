@@ -519,14 +519,8 @@ function buildLevel(){
       door={m:dm, open:false, y0:DH/2, DH, zEnd};
       // the room: every word the model could have said, on the far wall
       const RW=W*1.5, zFar=zEnd+ROOM;
-      const fl=surf(floorTex,RW*2,ROOM,[4,4],0.55,[1,1,1]); fl.rotation.x=-Math.PI/2; fl.position.set(0,0,zEnd+ROOM/2); LEVEL.add(fl);
-      const ce=surf(floorTex,RW*2,ROOM,[4,4],0.18,[1,1,1]); ce.rotation.x= Math.PI/2; ce.position.set(0,H,zEnd+ROOM/2); LEVEL.add(ce);
-      const sl=surf(wallTex,ROOM,H,[5,1],0.55,[1,0.93,0.82]); sl.rotation.y= Math.PI/2; sl.position.set(-RW,H/2,zEnd+ROOM/2); LEVEL.add(sl);
-      const sr=surf(wallTex,ROOM,H,[5,1],0.55,[1,0.93,0.82]); sr.rotation.y=-Math.PI/2; sr.position.set( RW,H/2,zEnd+ROOM/2); LEVEL.add(sr);
-      // the wall behind you, seen from the room side, with the door hole in it
-      for(const [w,h,cx,cy] of [[RW-DW,H,-(RW+DW)/2,H/2],[RW-DW,H,(RW+DW)/2,H/2],[2*DW,H-DH,0,DH+(H-DH)/2]]){
-        const b=surf(wallTex,w,h,[3,1],0.5,[1,0.93,0.82]); b.position.set(cx,cy,zEnd+0.02); LEVEL.add(b); }
-      // 49k words, once, tiny: the whole vocabulary. Positions kept for the glow.
+      // 49k words, once, tiny: the whole vocabulary. It papers every surface of
+      // the room - you stand inside everything the model could have said.
       const VC=4096, vc=document.createElement('canvas'); vc.width=vc.height=VC;
       const vx=vc.getContext('2d'); vx.fillStyle='#0a0806'; vx.fillRect(0,0,VC,VC);
       vx.font='10px ui-monospace,Menlo,monospace'; vx.textBaseline='top'; vx.fillStyle='#5c5148';
@@ -536,10 +530,17 @@ function buildLevel(){
         if(px+tw>VC-6){ px=6; py+=LH; if(py>VC-LH) break; }
         vx.fillText(t,px,py); pos[i]=[px,py,tw]; px+=tw+7;
       }
-      const vt=new THREE.CanvasTexture(vc); vt.minFilter=THREE.LinearFilter;
+      const vt=new THREE.CanvasTexture(vc); vt.minFilter=THREE.LinearFilter; vt.wrapS=vt.wrapT=THREE.RepeatWrapping;
       const vm=new THREE.Mesh(new THREE.PlaneGeometry(RW*2,H),new THREE.MeshBasicMaterial({map:vt}));
       vm.position.set(0,H/2,zFar); vm.rotation.y=Math.PI; LEVEL.add(vm);
-      const gc=document.createElement('canvas'); gc.width=gc.height=1024;
+      const fl=surf(floorTex,RW*2,ROOM,[4,4],0.45,[1,1,1]); fl.rotation.x=-Math.PI/2; fl.position.set(0,0,zEnd+ROOM/2); LEVEL.add(fl);
+      const ce=surf(vt,RW*2,ROOM,[1,1],0.55,[1,1,1]); ce.rotation.x= Math.PI/2; ce.position.set(0,H,zEnd+ROOM/2); LEVEL.add(ce);
+      const sl=surf(vt,ROOM,H,[1,0.28],0.7,[1,1,1]); sl.rotation.y= Math.PI/2; sl.position.set(-RW,H/2,zEnd+ROOM/2); LEVEL.add(sl);
+      const sr=surf(vt,ROOM,H,[1,0.28],0.7,[1,1,1]); sr.rotation.y=-Math.PI/2; sr.position.set( RW,H/2,zEnd+ROOM/2); LEVEL.add(sr);
+      for(const [w,h,cx,cy] of [[RW-DW,H,-(RW+DW)/2,H/2],[RW-DW,H,(RW+DW)/2,H/2],[2*DW,H-DH,0,DH+(H-DH)/2]]){
+        const b=surf(vt,w,h,[w/(RW*2),h/H*0.28],0.6,[1,1,1]); b.position.set(cx,cy,zEnd+0.02); LEVEL.add(b); }
+      // the 200 words it chose between, readable, on the far wall
+      const gc=document.createElement('canvas'); gc.width=2048; gc.height=Math.round(2048*H/(RW*2));
       const gt=new THREE.CanvasTexture(gc);
       const gm=new THREE.Mesh(new THREE.PlaneGeometry(RW*2,H),
         new THREE.MeshBasicMaterial({map:gt, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false}));
@@ -547,7 +548,7 @@ function buildLevel(){
       const cp=makePlate(1024,232);   // the one it said, on the floor before the wall
       const cm=new THREE.Mesh(new THREE.PlaneGeometry(7.2,1.63),cp.mat);
       cm.rotation.set(-Math.PI/2,0,Math.PI); cm.position.set(0,0.04,zFar-2.6); LEVEL.add(cm);
-      wall={pos, gc, gx:gc.getContext('2d'), gt, VC, plate:cp, drawn:-1};
+      wall={gc, gx:gc.getContext('2d'), gt, plate:cp, drawn:-1};
     }
     for(const [dz,txt] of [[SL*0.75,'RMSNORM  \u2192  RESCALED'],
                            [SL*0.36,'\u00D7 UNEMBEDDING  \u2192  151936 WORDS']]){
@@ -815,13 +816,25 @@ function showStep(i){
 // the wall of words: 200 candidates lit by probability, the one it said brightest
 function drawWall(i){
   const st=WAD.steps[i]; if(!st.top || wall.drawn===i) return; wall.drawn=i;
-  const g=wall.gx, k=wall.gc.width/wall.VC; g.clearRect(0,0,wall.gc.width,wall.gc.height);
-  const top=st.top;
-  for(let j=top.length-1;j>=0;j--){
-    const [id,p]=top[j], ps=wall.pos[id]; if(!ps) continue;
-    const a=Math.pow(p,0.45), pad=(j===0?10:3);
-    g.fillStyle='rgba(255,'+Math.round(150+80*a)+','+Math.round(40+60*a)+','+(0.12+0.88*a)+')';
-    g.fillRect(ps[0]*k-pad, ps[1]*k-pad, ps[2]*k+2*pad, 10*k+2*pad);
+  const g=wall.gx, GW=wall.gc.width, GH=wall.gc.height;
+  g.clearRect(0,0,GW,GH); g.fillStyle='rgba(6,4,2,.55)'; g.fillRect(0,0,GW,GH);
+  const top=st.top, txt=id=>((WAD.vocab[id]||'').replace(/\n/g,'⏎').replace(/^ /,'·')||'␣');
+  // the one it said: big, centre
+  { const [id,p]=top[0], a=Math.pow(p,0.4);
+    g.font='bold '+Math.round(GH*0.26)+'px ui-monospace,Menlo,monospace'; g.textAlign='center'; g.textBaseline='middle';
+    g.shadowColor='rgba(255,190,80,'+(0.5+0.5*a)+')'; g.shadowBlur=40;
+    g.fillStyle='rgba(255,'+Math.round(200+55*a)+','+Math.round(120+100*a)+',1)';
+    g.fillText(txt(id).slice(0,16), GW/2, GH*0.22); g.shadowBlur=0; }
+  // the other 199, flowing rows, size and brightness by probability
+  g.textAlign='left'; g.textBaseline='top';
+  let x=24, y=GH*0.40; const gap=22;
+  for(let j=1;j<top.length;j++){
+    const [id,p]=top[j], a=Math.pow(p,0.45), fs=Math.round(GH*0.045+GH*0.10*a);
+    g.font=(a>0.4?'bold ':'')+fs+'px ui-monospace,Menlo,monospace';
+    const t=txt(id).slice(0,14), w=g.measureText(t).width;
+    if(x+w>GW-24){ x=24; y+=fs*1.25; if(y>GH-fs) break; }
+    g.fillStyle='rgba(255,'+Math.round(170+70*a)+','+Math.round(70+80*a)+','+(0.28+0.72*a)+')';
+    g.fillText(t,x,y); x+=w+gap;
   }
   wall.gt.needsUpdate=true;
   const [id,p]=top[0], w=(WAD.vocab[id]||'').replace(/\n/g,'⏎');
