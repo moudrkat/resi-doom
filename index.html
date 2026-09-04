@@ -553,7 +553,7 @@ function buildLevel(){
       const vt=new THREE.CanvasTexture(vc); vt.minFilter=THREE.LinearFilter; vt.wrapS=vt.wrapT=THREE.RepeatWrapping;
       const vm=new THREE.Mesh(new THREE.PlaneGeometry(RW*2,H),new THREE.MeshBasicMaterial({map:vt}));
       vm.position.set(0,H/2,zFar); vm.rotation.y=Math.PI; LEVEL.add(vm);
-      const fl=surf(floorTex,RW*2,ROOM,[4,4],0.45,[1,1,1]); fl.rotation.x=-Math.PI/2; fl.position.set(0,0,zEnd+ROOM/2); LEVEL.add(fl);
+      const fl=surf(vt,RW*2,ROOM,[1,1],0.5,[1,1,1]); fl.rotation.x=-Math.PI/2; fl.position.set(0,0,zEnd+ROOM/2); LEVEL.add(fl);
       const ce=surf(vt,RW*2,ROOM,[1,1],0.55,[1,1,1]); ce.rotation.x= Math.PI/2; ce.position.set(0,H,zEnd+ROOM/2); LEVEL.add(ce);
       const sl=surf(vt,ROOM,H,[1,0.28],0.7,[1,1,1]); sl.rotation.y= Math.PI/2; sl.position.set(-RW,H/2,zEnd+ROOM/2); LEVEL.add(sl);
       const sr=surf(vt,ROOM,H,[1,0.28],0.7,[1,1,1]); sr.rotation.y=-Math.PI/2; sr.position.set( RW,H/2,zEnd+ROOM/2); LEVEL.add(sr);
