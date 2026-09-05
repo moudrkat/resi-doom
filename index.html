@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>RESI-DOOM</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600&display=swap">
@@ -10,7 +10,7 @@
   :root{color-scheme:dark}
   html,body{margin:0;height:100%;background:#000;overflow:hidden;
     font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;color:#c9bda6}
-  canvas{display:block;image-rendering:pixelated}
+  canvas{display:block;image-rendering:pixelated;touch-action:none}
   [hidden]{display:none!important}
   #fx{position:fixed;inset:0;pointer-events:none;z-index:3;
     background:radial-gradient(ellipse at 50% 45%,transparent 40%,rgba(0,0,0,.6) 97%),
@@ -29,10 +29,24 @@
   #word{font-size:23px;color:#ffe0a0;text-align:center;word-break:break-all;line-height:1.05;
     text-shadow:0 0 12px #ff9b1a44}
   #sink{font-size:24px;font-weight:700;line-height:.9;color:#d8492f;text-shadow:0 0 12px #d8492f55}
-  #gen{position:fixed;top:15px;right:17px;z-index:5;pointer-events:auto;background:#160f0a;
+  #hud{position:fixed;top:15px;right:17px;z-index:5;display:flex;gap:8px}
+  #hud button{pointer-events:auto;background:#160f0a;
     color:#ffb03a;border:1px solid #4a3418;padding:11px 18px;font:inherit;font-size:12px;
     letter-spacing:3px;cursor:pointer}
-  #gen:hover{background:#241708;border-color:#ffb03a}
+  #hud button:hover{background:#241708;border-color:#ffb03a}
+  #ownbtn{color:#c9a86a;letter-spacing:2px}
+  #own{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:8;width:min(560px,92vw);
+    background:#0d0a07f2;border:1px solid #4a3418;padding:18px 20px 14px;box-shadow:0 0 60px #000;
+    display:flex;flex-direction:column;gap:10px}
+  #own .k{font-size:9px;letter-spacing:3px;color:#8d7a5c;margin:0}
+  #own textarea{background:#080604;border:1px solid #3a2c18;color:#ffe0a0;font:inherit;font-size:13px;
+    padding:10px 12px;resize:vertical;min-height:4.2em;line-height:1.5}
+  #own .row{display:flex;gap:8px;align-items:center}
+  #own .row button{background:#241708;border:1px solid #ffb03a;color:#ffb03a;font:inherit;
+    font-size:11px;letter-spacing:2px;padding:9px 16px;cursor:pointer}
+  #own .row #ownx{background:#140f0a;border-color:#3a2c18;color:#8d7a5c}
+  #own .note{font-size:11px;color:#5c4d38;letter-spacing:.5px;margin:0;flex:1}
+  #ostat{color:#9dff7a;font-size:11.5px;min-height:1.4em;margin:0}
   #start{position:fixed;inset:0;z-index:9;display:flex;flex-direction:column;
     align-items:center;justify-content:center;cursor:pointer;text-align:center;
     background:radial-gradient(ellipse at 50% 45%,rgba(8,6,10,.94),rgba(8,6,10,.80))}
@@ -47,23 +61,69 @@
     letter-spacing:2px;color:#9dff7a;text-shadow:0 0 12px #000;opacity:0;transition:opacity .5s;
     pointer-events:none}
   #modes{display:flex;flex-direction:column;align-items:center;gap:14px;margin:22px 0 4px}
+  #corner{position:fixed;right:16px;bottom:14px;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+  #bsbtn{background:none;border:none;color:#3b3128;font:inherit;font-size:10px;letter-spacing:2px;
+    cursor:pointer;padding:4px 2px}
+  #bsbtn:hover{color:#ffb03a}
   .primary{font-size:19px!important;letter-spacing:9px!important;padding:16px 58px!important;
     color:#ffb03a!important;border-color:#7a5420!important;background:#1d1206!important;
     box-shadow:0 0 40px #ff9b1a22}
   .primary:hover{background:#2e1b07!important;border-color:#ffb03a!important;
     box-shadow:0 0 60px #ff9b1a44}
-  .alt{font-size:11px;color:#5c4d38;letter-spacing:1px}
-  .alt .mb{font-size:11px;padding:4px 9px;letter-spacing:1px;border-color:#2f2417}
   .mb{background:#140f0a;color:#c9a86a;border:1px solid #3a2c18;padding:9px 20px;
     font:inherit;font-size:11.5px;letter-spacing:2px;cursor:pointer}
   .mb:hover,.mb.on{background:#241708;border-color:#ffb03a;color:#ffb03a}
-  #mform{display:flex;gap:6px;margin-top:4px}
+  #mform{display:flex;gap:6px}
   #mform input{background:#0d0a07;border:1px solid #3a2c18;color:#ffe0a0;font:inherit;
-    font-size:12px;padding:8px 11px;width:340px}
+    font-size:11px;padding:6px 9px;width:220px}
   #mform button{background:#241708;border:1px solid #ffb03a;color:#ffb03a;font:inherit;
     font-size:11px;letter-spacing:2px;padding:8px 14px;cursor:pointer}
-  #mstat{color:#9dff7a!important;min-height:1.4em;font-size:11.5px!important}
+  #mstat{color:#9dff7a!important;min-height:1.4em;font-size:11px!important;text-align:right;margin:0!important}
   #xh{position:fixed;left:50%;top:50%;width:2px;height:2px;margin:-1px;z-index:4;background:#ffb03a;opacity:.45}
+  /* phones: a thumb to walk with, and the bar folded into two rows */
+  #pad{position:fixed;left:0;right:0;bottom:122px;z-index:5;display:flex;justify-content:space-between;
+    padding:0 16px;pointer-events:none}
+  #pad button{pointer-events:auto;width:68px;height:68px;border-radius:50%;background:#160f0ab8;
+    border:1px solid #6a4a1c;color:#ffb03a;font:inherit;font-size:24px;touch-action:none;
+    user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
+  #pad button:active{background:#3a2410;border-color:#ffb03a}
+  /* small screens, either way round: everything a size down, labels on one line */
+  @media (max-width:720px), (max-height:500px){
+    #start h1{font-size:24px;letter-spacing:7px}
+    #start p{font-size:11.5px;padding:0 18px}
+    #start .dim{font-size:9px;letter-spacing:1px}
+    .primary{font-size:16px!important;letter-spacing:7px!important;padding:14px 40px!important}
+    #corner{right:10px;bottom:8px}
+    #mform input{width:170px}
+    #hud{top:10px;right:10px;gap:6px}
+    #hud button{padding:8px 10px;font-size:10px;letter-spacing:2px}
+    #hintline{top:52px;font-size:11px;padding:0 14px}
+    #cheat{font-size:11px;padding:0 14px}
+    #say{font-size:13px;min-height:2.2em}
+    #bar{gap:6px;padding:6px 8px 8px}
+    #bar .cell{padding:4px 8px!important;min-width:0}
+    #bar canvas{width:100%!important;height:auto!important}
+    .k{font-size:7px;letter-spacing:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    #tok,#floor{font-size:22px}
+    #word{font-size:15px}
+    #sink{font-size:16px}
+    #own{padding:14px 14px 10px}
+    #own .row{flex-wrap:wrap}
+  }
+  /* upright phone: the bar folds into two rows, the map takes the second */
+  @media (max-width:720px){
+    #say{bottom:104px;padding:0 84px}
+    #bar{grid-template-columns:auto auto 1fr auto}
+    #bar .cell:nth-child(3){grid-column:1/-1;grid-row:2}
+  }
+  /* phone on its side: one thin row, thumbs just above it */
+  @media (max-height:500px) and (min-width:721px){
+    #bar{grid-template-columns:auto auto 1fr 1fr auto}
+    #say{bottom:60px;padding:0 90px}
+    #pad{bottom:64px}
+    #pad button{width:56px;height:56px;font-size:20px}
+    #hintline{top:48px}
+  }
 </style>
 </head>
 <body>
@@ -72,18 +132,32 @@
   <p style="color:#6b5a3f;margin-top:-8px">walk inside a language model while it generates</p>
   <p id="blurb">loading level…</p>
   <div id="modes">
-    <button class="mb primary" data-m="recorded">E N T E R</button>
-    <div class="alt">or run it yourself:
-      <button class="mb" data-m="live">your own sentence</button>
-      <button class="mb" data-m="bs">connect brainscope</button>
-    </div>
+    <button class="mb primary" id="enter">E N T E R</button>
   </div>
-  <div id="mform"></div>
-  <p id="mstat"></p>
   <p class="dim">W / S WALK &nbsp;·&nbsp; A / D OR MOUSE TO LOOK &nbsp;·&nbsp; ESC OUT &nbsp;·&nbsp; AND YES, THE CHEATS WORK</p>
+  <div id="corner">
+    <p id="mstat"></p>
+    <div id="mform" hidden><input placeholder="brainscope url" value="http://localhost:8010"><button id="bsgo">GO</button></div>
+    <button id="bsbtn">connect brainscope</button>
+  </div>
 </div>
 <div id="xh" hidden></div><div id="fx" hidden></div>
-<button id="gen" hidden>GENERATE</button>
+<div id="hud" hidden>
+  <button id="ownbtn">WRITE YOUR OWN</button>
+  <button id="gen">GENERATE</button>
+  <button id="outbtn" hidden>OUT</button>
+</div>
+<div id="pad" hidden><button id="padB">&#9660;</button><button id="padF">&#9650;</button></div>
+<div id="own" hidden>
+  <p class="k">YOUR OWN SENTENCE</p>
+  <textarea id="ownin" spellcheck="false"></textarea>
+  <div class="row">
+    <button id="owngo">DOWNLOAD THE MODEL &amp; RUN</button>
+    <button id="ownx">CLOSE</button>
+    <p class="note">SmolLM2-135M runs in this tab. 177 MB, downloaded once.</p>
+  </div>
+  <p id="ostat"></p>
+</div>
 <div id="cheat"></div>
 <div id="hintline"></div>
 <div id="say" hidden></div>
@@ -903,7 +977,8 @@ function drawWall(i){
 }
 
 // ---------- live: run the model here, compile the level as it speaks ----------
-const stat = t => { document.getElementById('mstat').textContent = t; };
+const stat = t => { document.getElementById(inGame ? 'ostat' : 'mstat').textContent = t; };
+const DEFAULT_PROMPT = 'Explain in detail, step by step, why a raindrop disappears when it lands on a window that is already wet. First,';
 let liveIds = [], sess = null, tokzr = null, lastNext = 0, liveRow = 0, liveMax = 1;
 
 async function liveInit(prompt){
@@ -949,6 +1024,7 @@ async function liveInit(prompt){
     mode = 'live'; buildLevel(); showStep(0);
     stat('READY — click anywhere to walk in; it keeps writing while you walk. '+
          'The windows fill in row by row, because that is how the matrix is built.');
+    if(inGame){ closeOwn(); cheatMsg('YOUR SENTENCE — it keeps writing while you walk'); }
     liveLoop(96);
   }catch(e){ console.error('LIVE FAILED', e);
     stat('live mode failed: '+(e && (e.message || e.name || String(e)) || 'unknown')); }
@@ -1062,7 +1138,8 @@ let cheatBuf='';
 function cheatMsg(t){ const e=document.getElementById('cheat');
   e.textContent=t; e.style.opacity=1; clearTimeout(cheatMsg.t);
   cheatMsg.t=setTimeout(()=>e.style.opacity=0,4200); }
-addEventListener('keydown',e=>{keys[e.code]=true;
+const typing = e => e.target && e.target.matches && e.target.matches('input,textarea');
+addEventListener('keydown',e=>{ if(typing(e)) return; keys[e.code]=true;
   if(/^Key[A-Z]$/.test(e.code)){ cheatBuf=(cheatBuf+e.code.slice(3)).slice(-8).toLowerCase();
     for(const c in CHEATS) if(cheatBuf.endsWith(c)){ cheatMsg(CHEATS[c]()); cheatBuf=''; } }});
 addEventListener('keyup',e=>{keys[e.code]=false;});
@@ -1080,8 +1157,19 @@ function hint(){
     setTimeout(()=>{ el.style.opacity=0; setTimeout(show,420); }, 4400); };
   show();
 }
+const TOUCH = matchMedia('(pointer:coarse)').matches || /[?&]touch/.test(location.search);   // a phone: no keys, no pointer lock; ?touch=1 previews it
 function showGame(on){ inGame=on; document.getElementById('start').hidden=on;
-  for(const id of ['bar','gen','xh','fx','say']) document.getElementById(id).hidden=!on; }
+  for(const id of ['bar','hud','xh','fx','say']) document.getElementById(id).hidden=!on;
+  document.getElementById('pad').hidden = !(on && TOUCH);
+  if(!on) closeOwn(); }
+// the sentence panel: written from inside, the model downloaded from inside
+const own=document.getElementById('own'), ownIn=document.getElementById('ownin');
+function openOwn(){ own.hidden=false;
+  document.getElementById('owngo').textContent = sess ? 'RUN' : 'DOWNLOAD THE MODEL & RUN';
+  if(!ownIn.value) ownIn.value=DEFAULT_PROMPT;
+  try{ document.exitPointerLock(); }catch(_){}
+  ownIn.focus(); }
+function closeOwn(){ own.hidden=true; }
 function enter(){ showGame(true);
   if(!playing && cur < WAD.steps.length-1){    // never drop anyone into a still corridor
     playing = true;
@@ -1097,27 +1185,53 @@ function run(){
   started=true;
   const start=document.getElementById('start');
   let begin=enter; // with ?rec this becomes "ask to share the tab, then enter"
-  start.onclick=e=>{ if(e.target.closest('#modes,#mform')) return; begin(); };
-  const form=document.getElementById('mform'); form.innerHTML='';
-  document.querySelectorAll('.mb').forEach(b=>b.onclick=()=>{
-    document.querySelectorAll('.mb').forEach(x=>x.classList.remove('on'));
-    b.classList.add('on'); form.innerHTML=''; stat('');
-    const m=b.dataset.m;
-    if(m==='recorded'){ begin(); return; }
-    const inp=document.createElement('input');
-    inp.value = m==='live' ? 'Explain in detail, step by step, why a raindrop disappears when it lands on a window that is already wet. First,'
-                           : 'http://localhost:8010';
-    inp.placeholder = m==='live' ? 'your sentence' : 'brainscope url';
-    const go=document.createElement('button'); go.textContent='GO';
-    go.onclick=()=> m==='live' ? liveInit(inp.value) : bsConnect(inp.value);
-    form.append(inp,go); inp.focus();
-  });
+  start.onclick=e=>{ if(e.target.closest('#corner')) return; begin(); };
+  // brainscope lives in the corner: a small word, and the url only if you ask
+  const form=document.getElementById('mform');
+  document.getElementById('bsbtn').onclick=()=>{ form.hidden=!form.hidden;
+    if(!form.hidden) form.querySelector('input').focus(); };
+  document.getElementById('bsgo').onclick=()=>bsConnect(form.querySelector('input').value);
+  form.querySelector('input').onkeydown=e=>{ if(e.key==='Enter') bsConnect(e.target.value); };
+  // your own sentence is written from inside the tunnel
+  document.getElementById('ownbtn').onclick=openOwn;
+  document.getElementById('ownx').onclick=closeOwn;
+  document.getElementById('owngo').onclick=()=>liveInit(ownIn.value);
+  ownIn.onkeydown=e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); liveInit(ownIn.value); } };
+  // a click on the tunnel takes the mouse back once the panel is closed
+  const lock=()=>{ try{ const r=renderer.domElement.requestPointerLock();
+    if(r && r.catch) r.catch(()=>{}); }catch(_){} };
+  renderer.domElement.addEventListener('click',()=>{
+    if(inGame && own.hidden && document.pointerLockElement!==renderer.domElement) lock(); });
+  if(TOUCH){
+    // drag the corridor to look; hold the arrows to walk; OUT is the ESC key
+    const dim=document.querySelector('#start .dim');
+    if(dim) dim.textContent='DRAG TO LOOK \u00a0\u00b7\u00a0 HOLD \u25b2 TO WALK \u00a0\u00b7\u00a0 OUT AT THE TOP';
+    const outb=document.getElementById('outbtn'); outb.hidden=false; outb.onclick=()=>showGame(false);
+    const c=renderer.domElement; let tid=null, lx=0, ly=0;
+    c.addEventListener('touchstart',e=>{ if(tid!==null) return; const t=e.changedTouches[0];
+      tid=t.identifier; lx=t.clientX; ly=t.clientY; },{passive:true});
+    c.addEventListener('touchmove',e=>{ e.preventDefault();
+      for(const t of e.changedTouches){ if(t.identifier!==tid) continue;
+        yaw=Math.max(-1.4,Math.min(1.4,yaw-(t.clientX-lx)*0.0045));
+        pitch=Math.max(-0.9,Math.min(0.9,pitch-(t.clientY-ly)*0.0045));
+        lx=t.clientX; ly=t.clientY; } },{passive:false});
+    const done=e=>{ for(const t of e.changedTouches) if(t.identifier===tid) tid=null; };
+    c.addEventListener('touchend',done); c.addEventListener('touchcancel',done);
+    for(const [id,code] of [['padF','KeyW'],['padB','KeyS']]){
+      const b=document.getElementById(id);
+      b.addEventListener('touchstart',e=>{ e.preventDefault(); keys[code]=true; },{passive:false});
+      for(const ev of ['touchend','touchcancel']) b.addEventListener(ev,e=>{ e.preventDefault(); keys[code]=false; });
+      b.addEventListener('contextmenu',e=>e.preventDefault());
+    }
+  }
   // Losing the pointer lock must NOT throw you out — some browsers drop it on
   // their own and you would bounce straight back to the menu. Only ESC leaves.
   document.addEventListener('pointerlockchange',()=>{
     if(document.pointerLockElement===renderer.domElement) showGame(true);
   });
-  addEventListener('keydown', e=>{ if(e.code==='Escape' && inGame) showGame(false); });
+  addEventListener('keydown', e=>{ if(e.code!=='Escape') return;
+    if(!own.hidden){ closeOwn(); return; }      // first ESC only closes the panel
+    if(inGame) showGame(false); });
   addEventListener('mousemove',e=>{
     if(document.pointerLockElement!==renderer.domElement) return;
     yaw=Math.max(-1.4,Math.min(1.4,yaw-e.movementX*0.0022));

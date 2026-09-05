@@ -35,10 +35,15 @@ the end of the corridor is yours to find.
   regardless.
 - **how dark a chamber is** — how much of its attention sits on the first token
 
-Three ways in: the **recorded** run above · **your own sentence**, with
-SmolLM2-135M running in your tab and its windows filling in row by row as it
-writes · **your own model**, live, through
-[brainscope](https://github.com/moudrkat/brainscope).
+Three ways in: the **recorded** run above · **your own sentence** — press
+`WRITE YOUR OWN` at the top right once you are inside; it downloads
+SmolLM2-135M (177 MB, once, and only when you press it) and runs it in your
+tab, the windows filling in row by row as it writes · **your own model**,
+live, through [brainscope](https://github.com/moudrkat/brainscope), from the
+corner of the start screen.
+
+On a phone: drag the corridor to look, hold the arrows to walk, `OUT` at the
+top leaves. `?touch=1` shows those controls on a desktop.
 
 `IDDQD` `IDKFA` `IDCLIP` `IDDT` work.
 
