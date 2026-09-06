@@ -34,6 +34,8 @@ the end of the corridor is yours to find.
   Layers cannot be compared this way either: both halves grow with depth
   regardless.
 - **how dark a chamber is** — how much of its attention sits on the first token
+- **the door at the end** — past the thirtieth chamber there is one more
+  room. What is in it is not written here.
 
 Three ways in: the **recorded** run above · **your own sentence** — press
 `WRITE YOUR OWN` at the top right once you are inside; it downloads
