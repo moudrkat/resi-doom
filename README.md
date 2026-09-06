@@ -13,16 +13,16 @@ your tab when you type your own sentence. It is already thinking when you walk
 in. `W` and `S` walk. That is the control scheme. What is behind the door at
 the end of the corridor is yours to find.
 
-- **sixteen windows a chamber** — one per attention head, each showing that
+- **nine windows a chamber** — one per attention head, each showing that
   head's attention matrix, with a line running down it as the model writes
-- **the floor** — the residual stream, all of it: every one of the 1024
+- **the floor** — the residual stream, all of it: every one of the 576
   dimensions at that layer, blue above zero, orange below, one cell each;
   the twelve largest follow in numbers, with their indices
 - **the strip under the windows** — what the attention block added to the
   stream at this step, every dimension
 - **the strip under each window** — what that head wrote, before the heads
-  are mixed together: its 128 values
-- **the wall at the tail** — the MLP, every one of its 3072 neurons after the
+  are mixed together: its 64 values
+- **the wall at the tail** — the MLP, every one of its 1536 neurons after the
   gate, and under them what the block added to the stream; the eight loudest
   neurons follow in numbers
 - **over the door** — the word this layer would say now, with the runner-up
@@ -60,7 +60,8 @@ light, sign and number comes from one forward pass over a real generation
 (`tools/compile_wad.py`, on a GPU). The level file is `wad.json` (signs,
 windows, lights) plus `wad.bin`, the everything file: every residual
 dimension, every MLP neuron, what each block added and what each head wrote,
-at every step, as int8 with one scale per vector (~50 MB for 220 tokens).
+at every step, as int8 with one scale per vector (17 MB for the 147 tokens
+of the recorded run; the 220 below is the cap, it stopped at its end token).
 
 The **logit lens is an approximation**: it pushes mid-stack states through a
 final norm and unembedding that were never meant for them, so the babbling

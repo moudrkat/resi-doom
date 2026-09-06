@@ -221,16 +221,16 @@ Promise.all([fetch('wad.json').then(r=>r.json()),
 // ---------- textures ----------
 function tex(kind){
   const c=document.createElement('canvas'); c.width=c.height=256; const x=c.getContext('2d');
-  x.fillStyle = kind==='floor' ? '#3a3128' : '#463a2c'; x.fillRect(0,0,256,256);
+  x.fillStyle = kind==='floor' ? '#1e2128' : '#252a33'; x.fillRect(0,0,256,256);
   for(let i=0;i<9000;i++){const v=Math.random()*44-22;
-    x.fillStyle=`rgba(${128+v},${118+v},${100+v},.16)`;x.fillRect(Math.random()*256,Math.random()*256,2,2);}
+    x.fillStyle=`rgba(${100+v},${108+v},${124+v},.14)`;x.fillRect(Math.random()*256,Math.random()*256,2,2);}
   x.strokeStyle='rgba(0,0,0,.55)'; x.lineWidth=3;
   if(kind==='floor'){for(let i=0;i<=256;i+=32){x.beginPath();x.moveTo(i,0);x.lineTo(i,256);
     x.moveTo(0,i);x.lineTo(256,i);x.stroke();}}
   else{for(let i=0;i<=256;i+=64){x.beginPath();x.moveTo(0,i);x.lineTo(256,i);x.stroke();}
     x.beginPath();x.moveTo(128,0);x.lineTo(128,256);x.stroke(); x.fillStyle='rgba(20,16,12,.85)';
     for(let gy=16;gy<256;gy+=64) for(const gx of [16,112,144,240]){x.beginPath();x.arc(gx,gy,4,0,TAU);x.fill();}}
-  for(let i=0;i<26;i++){x.fillStyle='rgba(18,12,8,'+(0.05+Math.random()*0.16)+')';
+  for(let i=0;i<26;i++){x.fillStyle='rgba(6,8,14,'+(0.05+Math.random()*0.16)+')';
     x.fillRect(Math.random()*256,Math.random()*160,3+Math.random()*10,60+Math.random()*96);}
   const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; return t;
 }
@@ -444,35 +444,26 @@ function graffiti(sinkStat, sector){
     [2,'t','LAST CLEAN ROOM',45], [2,'t','EVERY ROW SUMS TO ONE',190],
     [3,'a','hazard',0], [3,'t','SOFTMAX HAS NO OFF SWITCH',0], [3,'t','MIND THE SINK',0],
     [4,'a','drain',0], [4,'t',pct(4)+'% INTO A TOKEN THAT MEANS NOTHING',0],
-    [5,'t','ABANDON SEMANTICS ALL YE WHO ENTER',280],
-    [6,'a','back',15], [6,'t','I ONLY LOOK BACKWARDS',15],
+        [6,'a','back',15], [6,'t','I ONLY LOOK BACKWARDS',15],
     [7,'t',dims+' DIMENSIONS AND NOWHERE TO SIT',190],
-    [8,'t','IT ALL LOOKS LIKE C++ FROM HERE',95],
-    [9,'t','NOBODY HAS EVER READ LAYER 9',280], [9,'a','eye',280],
+        [9,'t','NOBODY HAS EVER READ LAYER 9',280], [9,'a','eye',280],
     [10,'t','WHO PUT THE DRAIN HERE',0],
     [11,'t','WE ARE ALL JUST DOT PRODUCTS',190],
-    [12,'t','HE WHO CONTROLS THE KV CACHE',45],
-    [13,'a','cake',320], [13,'t','THE CAKE IS A LIE',320],
-    [14,'t','LAYER 14 WAS AN INSIDE JOB',95], [14,'a','skull',0],
-    [15,'t','ATTENTION IS ALL YOU NEED (WE TRIED)',45],
-    [16,'t','DEPTH IS NOT UNDERSTANDING',130],
+            [14,'a','skull',0],
+        [16,'t','DEPTH IS NOT UNDERSTANDING',130],
     [17,'a','up',200], [17,'t','RESIDUAL STREAM',200],
-    [18,'t','ASK ME AGAIN IN LAYER 22',45],
-    [19,'t','THE LENS IS A LIE',0], [19,'t','HALF OF THIS IS THE INSTRUMENT',0],
+        [19,'t','HALF OF THIS IS THE INSTRUMENT',0],
     [20,'t','TUNED LENS WAS HERE',130],
     [21,'t','BEWARE OF THE ARGMAX',45],
-    [22,'t','FREE THE '+vsz,190],
-    [worst,'t','DO NOT LOOK BACK — '+pct(worst)+'%',0], [worst,'a','drain',0],
+        [worst,'t','DO NOT LOOK BACK — '+pct(worst)+'%',0], [worst,'a','drain',0],
     [median,'t','IT KNEW ALREADY',45],
     [NLl-5,'t','ALMOST A WORD',45],
     [NLl-4,'t','ONE PROMPT. ONE MODEL. NO STATISTICS.',280],
     [NLl-3,'t','GREEDY DECODING ONLY',280],
     [NLl-2,'t','FROM HERE IT IS JUST ENGLISH',45],
-    [NLl-1,'t','THE ANSWER WAS UPSTAIRS ALL ALONG',45],
-    [NLl-1,'t','STOP READING. START WALKING.',130],
+        [NLl-1,'t','STOP READING. START WALKING.',130],
     [0,'a','mask',45], [2,'a','hazard',0], [5,'a','eye',280], [7,'a','back',15],
-    [10,'a','up',200], [12,'a','drain',0], [16,'a','skull',0], [19,'a','cake',320],
-    [22,'a','mask',190], [24,'a','back',15], [26,'a','eye',95],
+    [10,'a','up',200], [12,'a','drain',0], [16,'a','skull',0],     [22,'a','mask',190], [24,'a','back',15], [26,'a','eye',95],
     [9,'t','SOME OF US ONLY COPY',95],
     [11,'t','MIND THE GAP BETWEEN FIRST AND SECOND',45],
     [14,'t','THE ANSWER IS NOT HERE YET',280],
@@ -489,19 +480,11 @@ function graffiti(sinkStat, sector){
     [8,'t','WAS IT THE MODEL OR THE LENS',0],
     [10,'t','EMBEDDINGS ARE TIED. SO ARE WE.',190],
     [11,'t','THIS IS NOT A CIRCUIT',95],
-    [12,'t','IN CASE OF HALLUCINATION BREAK GLASS',45],
-    [13,'t','NO REFUNDS ON LOGITS',320],
-    [15,'t','28 LAYERS AND STILL NO IDEA',95],
+            [15,'t',NLl+' LAYERS AND STILL NO IDEA',95],
     [16,'t','THE MAP IS NOT THE MODEL',130],
-    [17,'t','MIND THE RESIDUAL',200],
-    [18,'t','DO NOT FEED THE ARGMAX',45],
-    [19,'t','FLOOR PLAN INVENTED. LIGHTS MEASURED.',0],
-    [20,'t','NO SAE WAS HARMED',130],
-    [21,'t','YOU CANNOT SEE 1024 DIMENSIONS. NEITHER CAN I.',45],
-    [22,'t','ALL ROADS LEAD TO THE UNEMBEDDING',190],
-    [NLl-6,'t','ASK NEEL',280],
-    [NLl-2,'t','EXIT THROUGH THE SOFTMAX',45],
-  ];
+            [19,'t','FLOOR PLAN INVENTED. LIGHTS MEASURED.',0],
+        [21,'t','YOU CANNOT SEE '+dims+' DIMENSIONS. NEITHER CAN I.',45],
+              ];
   // group by chamber first, then space them out along it, alternating walls —
   // dropping each one wherever a modulo landed put them on top of each other
   const byRoom = {};
@@ -541,7 +524,7 @@ function build(){ initGL(); buildLevel(); run(); }
 function initGL(){
   THREE.ColorManagement.enabled = false;
   scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(0x0a0705, 0.026);
+  scene.fog = new THREE.FogExp2(0x04050a, 0.022);
   camera = new THREE.PerspectiveCamera(80, innerWidth/innerHeight, 0.1, 600);
   // preserveDrawingBuffer so the canvas can be captured to video; ?hq drops the
   // chunky Doom pixels for a crisp recording
@@ -578,14 +561,14 @@ function buildLevel(){
     m.material.color.setRGB(br*tint[0],br*tint[1],br*tint[2]); m.scale.set(w,h,1); return m;};
 
   for(let f=0; f<NF; f++){
-    const br=sector(Math.min(f,NL-1)), z=f*SL+SL/2, t=[0.86,0.86,0.95];
+    const br=sector(Math.min(f,NL-1)), z=f*SL+SL/2, t=[0.80,0.86,1.0];
     const fl=surf(floorTex,W*2,SL,[3,5],br*1.15,t); fl.rotation.x=-Math.PI/2; fl.position.set(0,0,z);
     const ce=surf(floorTex,W*2,SL,[3,5],br*0.42,t); ce.rotation.x= Math.PI/2; ce.position.set(0,H,z);
     const wl=surf(wallTex,SL,H,[5,1],br,t); wl.rotation.y= Math.PI/2; wl.position.set(-W,H/2,z);
     const wr=surf(wallTex,SL,H,[5,1],br,t); wr.rotation.y=-Math.PI/2; wr.position.set( W,H/2,z);
     LEVEL.add(fl,ce,wl,wr); rooms.push({m:[fl,ce,wl,wr],br});
     const zz=f*SL, fr=new THREE.MeshBasicMaterial({map:wallTex.clone()});
-    fr.color.setRGB(br*0.55,br*0.5,br*0.44);
+    fr.color.setRGB(br*0.42,br*0.46,br*0.56);
     for(const sx of [-1,1]){const m=new THREE.Mesh(new THREE.BoxGeometry(1.5,H,1.1),fr);
       m.position.set(sx*(W-0.75),H/2,zz); LEVEL.add(m);}
     const lint=new THREE.Mesh(new THREE.BoxGeometry(W*2,1.3,1.1),fr);
@@ -612,8 +595,8 @@ function buildLevel(){
     nm.position.set(-W+0.06,2.5,zz+1.2); nm.rotation.y=Math.PI/2; LEVEL.add(nm);
   }
   // The start, mirroring the end: a word arrives, the embedding turns it into
-  // the vector, and only then do the numbers begin. Qwen3 has no positional
-  // embedding table - position enters inside attention as RoPE - so there is
+  // the vector, and only then do the numbers begin. SmolLM2, like Qwen3, has no
+  // positional embedding table - position enters inside attention as RoPE - so there is
   // nothing to draw between them.
   { const front=surf(wallTex,W*2,H,[5,1],1.0,[1,0.93,0.82]);
     front.position.set(0,H/2,0); LEVEL.add(front);
@@ -686,7 +669,7 @@ function buildLevel(){
       wall={gc, gx:gc.getContext('2d'), gt, plate:cp, drawn:-1, plateZ:zFar-2.6, onPlate:false};
     }
     for(const [dz,txt] of [[SL*0.75,'RMSNORM  \u2192  RESCALED'],
-                           [SL*0.36,'\u00D7 UNEMBEDDING  \u2192  151936 WORDS']]){
+                           [SL*0.36,'\u00D7 UNEMBEDDING  \u2192  '+((WAD.vocab&&WAD.vocab.length)||'ALL THE')+' WORDS']]){
       const fp=makePlate(768,64); drawPlate(fp,txt,false);
       const fm=new THREE.Mesh(new THREE.PlaneGeometry(3.4,0.42),fp.mat);
       fm.rotation.set(-Math.PI/2,0,Math.PI);
@@ -731,6 +714,16 @@ function buildLevel(){
     t.magFilter=THREE.NearestFilter; t.minFilter=THREE.NearestFilter; return t;
   };
   const frameGeo=new THREE.PlaneGeometry(1.30,1.30), glassGeo=new THREE.PlaneGeometry(1.06,1.06);
+  // the light in a chamber comes through its windows: a warm halo on the wall
+  // behind each one, as bright as that head is sharp at this step. A chamber
+  // whose heads stare at the first token stays dark; one head that has found
+  // its word glows alone.
+  const haloTex=(()=>{ const c=document.createElement('canvas'); c.width=c.height=256;
+    const x=c.getContext('2d'), g=x.createRadialGradient(128,128,0,128,128,128);
+    g.addColorStop(0,'rgba(255,255,255,1)'); g.addColorStop(0.35,'rgba(255,255,255,.45)');
+    g.addColorStop(1,'rgba(255,255,255,0)'); x.fillStyle=g; x.fillRect(0,0,256,256);
+    return new THREE.CanvasTexture(c); })();
+  const haloGeo=new THREE.PlaneGeometry(4.6,4.6);
   for(let l=0;l<NL;l++){
     const row=[];
     for(let h=0;h<NH;h++){
@@ -752,7 +745,10 @@ function buildLevel(){
       const sh=new THREE.Mesh(new THREE.PlaneGeometry(1.06,1.06),
         new THREE.MeshBasicMaterial({color:0x0b0805, transparent:true, opacity:0.58}));
       sh.position.set(side*(W-0.11), 2.35, z); sh.rotation.y=g.rotation.y;
-      LEVEL.add(fm,g,lm,sh,ln); row.push({g, line:ln, shade:sh, top:2.35+0.53});
+      const halo=new THREE.Mesh(haloGeo,new THREE.MeshBasicMaterial({map:haloTex,
+        color:0xffb03a, transparent:true, opacity:0.3, blending:THREE.AdditiveBlending, depthWrite:false}));
+      halo.position.set(side*(W-0.03),2.35,z); halo.rotation.y=g.rotation.y;
+      LEVEL.add(halo,fm,g,lm,sh,ln); row.push({g, halo, line:ln, shade:sh, top:2.35+0.53});
       if(FULL){   // what this head wrote at this step, before o_proj: head_dim values
         const c5=document.createElement('canvas'); c5.width=512; c5.height=24;
         const t5=new THREE.CanvasTexture(c5); t5.magFilter=THREE.NearestFilter;
@@ -837,7 +833,9 @@ function showStep(i){
     const [ent,sink] = st.l[l] || [[],[]];
     for(let h=0;h<NH;h++){
       const G = lamps[l][h];
-      G.g.material.opacity = 0.62 + 0.38*(1-(ent[h]??0.5));            // sharp head = bright glass
+      const sharp = 1-(ent[h]??0.5);
+      G.g.material.opacity = 0.62 + 0.38*sharp;            // sharp head = bright glass
+      if(G.halo) G.halo.material.opacity = 0.05 + 0.5*sharp*sharp;   // and its light on the wall
       if(G.line){ G.line.position.y = G.top - 1.06*frac; G.line.visible = frac < 0.995; }
       if(G.shade){                      // the rows it has not written yet
         const hgt = Math.max(0.001, 1.06*(1-frac));
