@@ -205,18 +205,33 @@ function band(x, q, x0, y0, w, h){
 }
 let LEVEL = null, mode = 'recorded', sinkOf = ()=>0, livePanes = [];
 
-Promise.all([fetch('wad.json').then(r=>r.json()),
+// the level is 21 MB; on a phone that is a while, so say how far it is
+const blurbEl = document.getElementById('blurb');
+async function pull(url, what){
+  const r = await fetch(url); if(!r.ok) throw new Error(url+' '+r.status);
+  const total = +r.headers.get('Content-Length') || 0, MB = x => (x/1048576).toFixed(1);
+  if(!r.body) return new Uint8Array(await r.arrayBuffer());
+  const rd = r.body.getReader(), parts = []; let got = 0;
+  for(;;){ const {done, value} = await rd.read(); if(done) break;
+    parts.push(value); got += value.length;
+    blurbEl.textContent = what+' \u00b7 '+MB(got)+(total ? ' of '+MB(total) : '')+' MB'; }
+  const out = new Uint8Array(got); let o = 0;
+  for(const q of parts){ out.set(q, o); o += q.length; }
+  return out;
+}
+Promise.all([pull('wad.json', 'loading the level').then(b=>JSON.parse(new TextDecoder().decode(b))),
   (document.fonts ? document.fonts.load("600 60px Caveat").catch(()=>{}) : 0)])
   .then(async ([w]) => {
     WAD = w;
     // everything: every residual dimension, every MLP neuron, what each block
     // added and what each head wrote — int8, one flat file beside the level
     if(w.full && w.full.file){
-      try{ FULL = new Int8Array(await fetch(w.full.file).then(r=>r.arrayBuffer())); }
+      try{ FULL = new Int8Array((await pull(w.full.file, 'loading the walls')).buffer); }
       catch(e){ console.warn('no', w.full.file, e); FULL = null; }
     }
-    build();
-  });
+    blurbEl.textContent = 'building the level\u2026';
+    setTimeout(build, 30);   // let that line paint before the 49k words do
+  }).catch(e => { blurbEl.textContent = 'the level did not load: '+e.message; console.error(e); });
 
 // ---------- textures ----------
 function tex(kind){
