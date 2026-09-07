@@ -8,9 +8,10 @@ OUT   = sys.argv[3] if len(sys.argv) > 3 else "wad.json"
 PROMPT = ("A raindrop lands on a window that is already wet and disappears. "
           "Why? Think it through, then answer.")
 
+DEV = "cuda" if torch.cuda.is_available() else "cpu"   # 135M runs fine on a CPU
 tok = AutoTokenizer.from_pretrained(MID)
 model = AutoModelForCausalLM.from_pretrained(
-    MID, dtype=torch.float32, attn_implementation="eager").cuda().eval()
+    MID, dtype=torch.float32, attn_implementation="eager").to(DEV).eval()
 cfg = model.config
 L, H = cfg.num_hidden_layers, cfg.num_attention_heads
 print(f"MODEL {MID}: layers={L} heads={H} hidden={cfg.hidden_size}")
@@ -21,7 +22,7 @@ try:
                                    enable_thinking=True)
 except TypeError:
     text = tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True)
-ids = tok(text, return_tensors="pt").input_ids.cuda()
+ids = tok(text, return_tensors="pt").input_ids.to(DEV)
 n_prompt = ids.shape[1]
 
 # 1) generate normally (fast, with cache)
@@ -62,7 +63,10 @@ for t in range(len(gen_ids)):
     # and that near-tie is the whole character of the readout
     floors = []
     for l in range(L + 1):
-        z = head(norm(o.hidden_states[l][0, q]))
+        # HF appends the LAST hidden state after the final norm, so it must not
+        # be normed again - doing so was what put junk over the last door
+        hq = o.hidden_states[l][0, q]
+        z = head(hq) if l == L else head(norm(hq))
         p = z.softmax(-1); top = p.topk(3)
         floors.append([[tok.decode([i]), round(v, 3)]
                        for i, v in zip(top.indices.tolist(),

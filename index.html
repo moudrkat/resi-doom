@@ -650,13 +650,15 @@ function buildLevel(){
       // the room - you stand inside everything the model could have said.
       const VC=4096, vc=document.createElement('canvas'); vc.width=vc.height=VC;
       const vx=vc.getContext('2d'); vx.fillStyle='#0a0806'; vx.fillRect(0,0,VC,VC);
-      vx.font='10px ui-monospace,Menlo,monospace'; vx.textBaseline='top'; vx.fillStyle='#5c5148';
-      const pos=new Array(WAD.vocab.length); let px=6, py=6; const LH=10;
+      // 8px, not 10: at 10px the canvas ran out of rows 13k words early
+      vx.font='8px ui-monospace,Menlo,monospace'; vx.textBaseline='top'; vx.fillStyle='#5c5148';
+      const pos=new Array(WAD.vocab.length); let px=6, py=6; const LH=8;
       for(let i=0;i<WAD.vocab.length;i++){
         const t=(WAD.vocab[i]||'').replace(/\s+/g,'\u00b7').slice(0,14); const tw=vx.measureText(t).width;
         if(px+tw>VC-6){ px=6; py+=LH; if(py>VC-LH) break; }
-        vx.fillText(t,px,py); pos[i]=[px,py,tw]; px+=tw+7;
+        vx.fillText(t,px,py); pos[i]=[px,py,tw]; px+=tw+5;
       }
+      if(pos[WAD.vocab.length-1]===undefined) console.warn('vocabulary wallpaper: not every word fitted');
       const vt=new THREE.CanvasTexture(vc); vt.minFilter=THREE.LinearFilter; vt.wrapS=vt.wrapT=THREE.RepeatWrapping;
       const vm=new THREE.Mesh(new THREE.PlaneGeometry(RW*2,H),new THREE.MeshBasicMaterial({map:vt}));
       vm.position.set(0,H/2,zFar); vm.rotation.y=Math.PI; LEVEL.add(vm);
