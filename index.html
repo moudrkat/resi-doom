@@ -682,12 +682,14 @@ function buildLevel(){
       // its walls, floor and ceiling grow, each out of the place it is painted,
       // so you can see that the wallpaper is the vocabulary
       const BC=2048, bc=document.createElement('canvas'); bc.width=bc.height=BC;
-      const bx=bc.getContext('2d'), bt=[], bm=[];
-      const bplane=(w,h,rep)=>{ const t=new THREE.CanvasTexture(bc); t.wrapS=t.wrapT=THREE.RepeatWrapping;
-        t.repeat.set(rep[0],rep[1]); bt.push(t);
-        const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h), new THREE.MeshBasicMaterial(
-          {map:t, transparent:true, opacity:0, blending:THREE.AdditiveBlending, depthWrite:false}));
-        bm.push(m); LEVEL.add(m); return m; };
+      const bx=bc.getContext('2d'), bm=[];
+      // one texture and one material for all seven surfaces - the repeat goes
+      // into the geometry's uvs, so a phone uploads 16 MB once, not seven times
+      const bt=new THREE.CanvasTexture(bc); bt.wrapS=bt.wrapT=THREE.RepeatWrapping;
+      const bmat=new THREE.MeshBasicMaterial({map:bt, transparent:true, opacity:0, blending:THREE.AdditiveBlending, depthWrite:false});
+      const bplane=(w,h,rep)=>{ const g=new THREE.PlaneGeometry(w,h), uv=g.attributes.uv;
+        for(let k=0;k<uv.count;k++) uv.setXY(k, uv.getX(k)*rep[0], uv.getY(k)*rep[1]);
+        const m=new THREE.Mesh(g, bmat); bm.push(m); LEVEL.add(m); return m; };
       { const m=bplane(RW*2,ROOM,[1,1]); m.rotation.x=-Math.PI/2; m.position.set(0,0.03,zEnd+ROOM/2); }
       { const m=bplane(RW*2,ROOM,[1,1]); m.rotation.x= Math.PI/2; m.position.set(0,H-0.03,zEnd+ROOM/2); }
       { const m=bplane(ROOM,H,[1,0.28]); m.rotation.y= Math.PI/2; m.position.set(-RW+0.03,H/2,zEnd+ROOM/2); }
@@ -707,7 +709,7 @@ function buildLevel(){
           bx.fillStyle='rgba(255,'+Math.round(165+50*a)+','+Math.round(70+70*a)+','+a.toFixed(2)+')';
           bx.fillText(t, q[0]*BC/VC, q[1]*BC/VC - fs*0.3);   // grows out of where it is painted
         }
-        for(const t of bt) t.needsUpdate=true;
+        bt.needsUpdate=true;
         wall.bage=0;
       };
     }
@@ -1376,7 +1378,7 @@ function frame(now){
       if(wall.bage>=0){                    // the big words: sudden, held while you stand there, then gone
         wall.bage+=dt; if(on) wall.bage=Math.min(wall.bage,0.3);
         const o=wall.bage<0.3 ? wall.bage/0.3 : Math.max(0, 1-(wall.bage-0.3)/4.5);
-        for(const m of wall.bm) m.material.opacity=o;
+        wall.bm[0].material.opacity=o;      // one material, shared
         if(o<=0 && !on) wall.bage=-1; } }
     free.set(0,1.72,z);
     camera.position.set(Math.sin(bob*0.5)*0.07*moving, 1.72+Math.sin(bob)*0.055*moving, z);
