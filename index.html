@@ -1390,10 +1390,12 @@ function frame(now){
       if(on && !wall.onPlate){ cur=0; showStep(0); pulse=0; playing=true; wall.burst();
         document.getElementById('gen').textContent='PAUSE'; cheatMsg('AGAIN, FROM THE FIRST WORD'); }
       wall.onPlate=on;
-      if(wall.bage>=0){                    // the big words: sudden, held while you stand there, then gone
-        wall.bage+=dt; if(on) wall.bage=Math.min(wall.bage,0.3);
-        const o=wall.bage<0.3 ? wall.bage/0.3 : Math.max(0, 1-(wall.bage-0.3)/4.5);
-        wall.bm[0].material.opacity=o;      // one material, shared
+      if(wall.bage>=0){                    // the big words: sudden, held while you stand there, then a slow fade
+        wall.bage+=dt; wall.bpulse=(wall.bpulse||0)+dt;
+        if(on) wall.bage=Math.min(wall.bage,0.3);
+        const o=wall.bage<0.3 ? wall.bage/0.3 : Math.max(0, 1-(wall.bage-0.3)/14);
+        const breath=0.86+0.14*Math.sin(wall.bpulse*1.9);   // and they breathe a little
+        wall.bm[0].material.opacity=o*breath;      // one material, shared
         if(o<=0 && !on) wall.bage=-1; } }
     free.set(0,1.72,z);
     camera.position.set(Math.sin(bob*0.5)*0.07*moving, 1.72+Math.sin(bob)*0.055*moving, z);
